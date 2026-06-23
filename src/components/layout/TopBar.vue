@@ -1,15 +1,15 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { useCanvasStore } from '@/stores/canvas'
-import { useExcelStore } from '@/stores/excel'
+import { ref } from "vue";
+import { useCanvasStore } from "@/stores/canvas";
+import { useExcelStore } from "@/stores/excel";
 
-const canvasStore = useCanvasStore()
-const excelStore = useExcelStore()
+const canvasStore = useCanvasStore();
+const excelStore = useExcelStore();
 
 // 工作文件操作：保存/加载设计
-const showFileMenu = ref(false)
-const showFontMenu = ref(false)
-const showAbout = ref(false)
+const showFileMenu = ref(false);
+const showFontMenu = ref(false);
+const showAbout = ref(false);
 
 // 保存设计到本地
 function saveDesign(): void {
@@ -17,60 +17,66 @@ function saveDesign(): void {
     elements: canvasStore.elements,
     paper: canvasStore.paper,
     excel: excelStore.data,
-  }
+  };
   const blob = new Blob([JSON.stringify(payload, null, 2)], {
-    type: 'application/json',
-  })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `设计文件_${Date.now()}.json`
-  a.click()
-  URL.revokeObjectURL(url)
-  showFileMenu.value = false
+    type: "application/json",
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `设计文件_${Date.now()}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showFileMenu.value = false;
 }
 
 // 从本地加载设计
 function loadDesign(): void {
-  const input = document.createElement('input')
-  input.type = 'file'
-  input.accept = '.json'
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = ".json";
   input.onchange = async () => {
-    const file = input.files?.[0]
-    if (!file) return
-    const text = await file.text()
+    const file = input.files?.[0];
+    if (!file) return;
+    const text = await file.text();
     try {
-      const data = JSON.parse(text)
+      const data = JSON.parse(text);
       if (Array.isArray(data.elements)) {
-        canvasStore.clearElements()
+        canvasStore.clearElements();
         for (const el of data.elements) {
-          canvasStore.elements.push(el)
+          canvasStore.elements.push(el);
         }
       }
-      if (data.paper) canvasStore.updatePaper(data.paper)
+      if (data.paper) canvasStore.updatePaper(data.paper);
       if (data.excel) {
-        excelStore.data = data.excel
+        excelStore.data = data.excel;
       }
     } catch {
       // 忽略解析错误
     }
-  }
-  input.click()
-  showFileMenu.value = false
+  };
+  input.click();
+  showFileMenu.value = false;
 }
 
 // 清空画布
 function clearCanvas(): void {
-  if (confirm('确定清空画布所有元素吗？')) {
-    canvasStore.clearElements()
+  if (confirm("确定清空画布所有元素吗？")) {
+    canvasStore.clearElements();
   }
-  showFileMenu.value = false
+  showFileMenu.value = false;
+}
+
+// 加载示例数据
+function loadDemo(): void {
+  excelStore.loadDemo();
+  showFileMenu.value = false;
 }
 
 // 关闭所有菜单
 function closeAllMenus(): void {
-  showFileMenu.value = false
-  showFontMenu.value = false
+  showFileMenu.value = false;
+  showFontMenu.value = false;
 }
 </script>
 
@@ -101,7 +107,10 @@ function closeAllMenus(): void {
         <button
           class="btn btn-default btn-sm"
           :class="{ active: showFileMenu }"
-          @click="showFileMenu = !showFileMenu; showFontMenu = false"
+          @click="
+            showFileMenu = !showFileMenu;
+            showFontMenu = false;
+          "
         >
           工作文件
         </button>
@@ -123,6 +132,13 @@ function closeAllMenus(): void {
           </button>
           <div class="dropdown-divider" />
           <button
+            class="dropdown-item"
+            @click="loadDemo"
+          >
+            使用 demo 数据
+          </button>
+          <div class="dropdown-divider" />
+          <button
             class="dropdown-item danger"
             @click="clearCanvas"
           >
@@ -138,7 +154,10 @@ function closeAllMenus(): void {
         <button
           class="btn btn-default btn-sm"
           :class="{ active: showFontMenu }"
-          @click="showFontMenu = !showFontMenu; showFileMenu = false"
+          @click="
+            showFontMenu = !showFontMenu;
+            showFileMenu = false;
+          "
         >
           字体管理
         </button>
@@ -177,7 +196,8 @@ function closeAllMenus(): void {
             关于批量证件设计器
           </h2>
           <p class="modal-desc">
-            一款面向普通用户的可视化排版工具，用于把 Excel 表格中的数据批量生成带有个性化版式的 PDF、PNG 或 JPG。
+            一款面向普通用户的可视化排版工具，用于把 Excel
+            表格中的数据批量生成带有个性化版式的 PDF、PNG 或 JPG。
           </p>
           <ul class="modal-features">
             <li>导入 Excel 数据表，支持变量引用</li>
@@ -350,7 +370,7 @@ function closeAllMenus(): void {
 }
 
 .modal-features li::before {
-  content: '·';
+  content: "·";
   margin-right: 8px;
   color: var(--color-primary);
   font-weight: 700;

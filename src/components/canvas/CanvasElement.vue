@@ -86,6 +86,54 @@ let startY = 0;
 let originX = 0;
 let originY = 0;
 
+// 文本双击编辑
+const editing = ref(false);
+const editText = ref("");
+const editRef = ref<HTMLTextAreaElement | null>(null);
+
+function handleDoubleClick(event: MouseEvent): void {
+  if (props.element.locked) return;
+  if (props.element.type !== "text") return;
+  event.stopPropagation();
+  event.preventDefault();
+  editing.value = true;
+  editText.value = props.element.content;
+  // 下一帧聚焦 textarea 并选中全部内容
+  requestAnimationFrame(() => {
+    editRef.value?.focus();
+    editRef.value?.select();
+  });
+}
+
+function commitEdit(): void {
+  if (!editing.value) return;
+  editing.value = false;
+  if (
+    props.element.type === "text" &&
+    editText.value !== props.element.content
+  ) {
+    canvasStore.updateElement(props.element.id, { content: editText.value });
+  }
+}
+
+function cancelEdit(): void {
+  editing.value = false;
+}
+
+function handleEditKeydown(event: KeyboardEvent): void {
+  // Esc 退出编辑不保存
+  if (event.key === "Escape") {
+    event.preventDefault();
+    cancelEdit();
+    return;
+  }
+  // Enter（无 Shift）退出编辑并保存
+  if (event.key === "Enter" && !event.shiftKey) {
+    event.preventDefault();
+    commitEdit();
+  }
+}
+
 function handleMouseDown(event: MouseEvent): void {
   if (props.element.locked) return;
   if (event.button !== 0) return;
@@ -190,10 +238,34 @@ function handleResizeMove(event: MouseEvent, handle: ResizeHandle): void {
     :style="elementStyle"
     @mousedown="handleMouseDown"
     @click.stop="canvasStore.selectElement(element.id)"
+    @dblclick="handleDoubleClick"
   >
     <!-- 文本元素内容 -->
     <template v-if="element.type === 'text'">
-      {{ displayContent }}
+      <textarea
+        v-if="editing"
+        ref="editRef"
+        v-model="editText"
+        class="element-edit-textarea"
+        :style="{
+          color: element.color,
+          fontFamily: element.fontFamily,
+          fontSize: element.fontSize + 'px',
+          fontWeight: String(element.fontWeight),
+          fontStyle: element.fontStyle,
+          textAlign: element.textAlign,
+          lineHeight: String(element.lineHeight),
+          letterSpacing: element.letterSpacing + 'px',
+          padding: element.padding + 'px',
+        }"
+        @blur="commitEdit"
+        @keydown="handleEditKeydown"
+        @mousedown.stop
+        @click.stop
+      />
+      <template v-else>
+        {{ displayContent }}
+      </template>
     </template>
 
     <!-- 图片元素内容 -->
@@ -247,6 +319,19 @@ function handleResizeMove(event: MouseEvent, handle: ResizeHandle): void {
 
 .canvas-element.dragging {
   opacity: 0.8;
+}
+
+.element-edit-textarea {
+  width: 100%;
+  height: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+  resize: none;
+  box-sizing: border-box;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow: hidden;
 }
 
 .element-image {
