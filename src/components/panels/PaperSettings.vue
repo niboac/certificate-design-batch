@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useCanvasStore } from '@/stores/canvas'
 import { PAPER_PRESETS } from '@/utils/fonts'
-import type { PaperUnit } from '@/types'
+import type { PaperOrientation, PaperUnit } from '@/types'
 
 const canvasStore = useCanvasStore()
 
@@ -12,6 +12,12 @@ const unitOptions: { value: PaperUnit; label: string }[] = [
   { value: 'px', label: '像素' },
 ]
 
+// 方向选项
+const orientationOptions: { value: PaperOrientation; label: string }[] = [
+  { value: 'portrait', label: '竖向' },
+  { value: 'landscape', label: '横向' },
+]
+
 // 应用预设
 function applyPreset(preset: (typeof PAPER_PRESETS)[number]): void {
   canvasStore.updatePaper({
@@ -19,37 +25,6 @@ function applyPreset(preset: (typeof PAPER_PRESETS)[number]): void {
     height: preset.height,
     orientation: preset.orientation,
   })
-}
-
-// 导入底稿
-function handleDraftUpload(event: Event): void {
-  const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
-  if (!file) return
-
-  const reader = new FileReader()
-  reader.onload = (e) => {
-    const src = e.target?.result as string
-    // 加载图片获取尺寸
-    const img = new Image()
-    img.onload = () => {
-      // 自动设置稿纸尺寸为底稿尺寸（像素）
-      canvasStore.updatePaper({
-        width: img.width,
-        height: img.height,
-        unit: 'px',
-      })
-      canvasStore.setDraft(src, canvasStore.draft?.opacity ?? 1)
-    }
-    img.src = src
-  }
-  reader.readAsDataURL(file)
-  input.value = ''
-}
-
-// 移除底稿
-function removeDraft(): void {
-  canvasStore.clearDraft()
 }
 </script>
 
@@ -127,6 +102,20 @@ function removeDraft(): void {
           </select>
         </div>
       </div>
+      <div class="form-item">
+        <label class="form-label">方向</label>
+        <div class="btn-group">
+          <button
+            v-for="opt in orientationOptions"
+            :key="opt.value"
+            class="btn-toggle"
+            :class="{ active: canvasStore.paper.orientation === opt.value }"
+            @click="canvasStore.updatePaper({ orientation: opt.value })"
+          >
+            {{ opt.label }}
+          </button>
+        </div>
+      </div>
     </div>
 
     <!-- 背景与网格 -->
@@ -176,66 +165,6 @@ function removeDraft(): void {
         </div>
       </div>
     </div>
-
-    <!-- 底稿 -->
-    <div class="panel-section">
-      <h3 class="panel-title">
-        底稿
-      </h3>
-      <div v-if="canvasStore.draft">
-        <div class="draft-preview">
-          <img
-            :src="canvasStore.draft.src"
-            alt="底稿预览"
-          >
-        </div>
-        <div class="form-item">
-          <label class="form-label">底稿透明度</label>
-          <div class="range-control">
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.05"
-              :value="canvasStore.draft.opacity"
-              @input="canvasStore.updateDraftOpacity(Number(($event.target as HTMLInputElement).value))"
-            >
-            <span class="range-value">{{ Math.round(canvasStore.draft.opacity * 100) }}%</span>
-          </div>
-        </div>
-        <div class="draft-actions">
-          <button
-            class="btn btn-sm btn-ghost"
-            @click="removeDraft"
-          >
-            移除底稿
-          </button>
-          <label class="btn btn-sm btn-ghost">
-            更换底稿
-            <input
-              type="file"
-              accept="image/*"
-              hidden
-              @change="handleDraftUpload"
-            >
-          </label>
-        </div>
-      </div>
-      <div v-else>
-        <p class="form-hint">
-          导入底稿用于定位文字摆放位置
-        </p>
-        <label class="btn-draft-upload">
-          选择底稿图片
-          <input
-            type="file"
-            accept="image/*"
-            hidden
-            @change="handleDraftUpload"
-          >
-        </label>
-      </div>
-    </div>
   </div>
 </template>
 
@@ -275,8 +204,6 @@ function removeDraft(): void {
 }
 
 .form-item {
-  display: flex;
-  flex-direction: column;
   margin-bottom: 10px;
 }
 
@@ -321,41 +248,5 @@ function removeDraft(): void {
   background-color: var(--color-primary);
   border-color: var(--color-primary);
   color: #fff;
-}
-
-.draft-preview {
-  margin-bottom: 10px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-}
-
-.draft-preview img {
-  display: block;
-  width: 100%;
-  height: auto;
-}
-
-.draft-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.btn-draft-upload {
-  display: block;
-  width: 100%;
-  padding: 10px 16px;
-  background-color: var(--color-primary);
-  color: #fff;
-  font-size: 13px;
-  font-weight: 500;
-  text-align: center;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  transition: background-color 0.15s ease;
-}
-
-.btn-draft-upload:hover {
-  background-color: var(--color-primary-hover);
 }
 </style>

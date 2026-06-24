@@ -1,9 +1,6 @@
 // 元素类型枚举
 export type ElementType = 'text' | 'image'
 
-// 图片源类型
-export type ImageSourceType = 'static' | 'dynamic'
-
 // 文本对齐方式
 export type TextAlign = 'left' | 'center' | 'right'
 
@@ -25,17 +22,14 @@ export type FontWeight = 'normal' | 'bold' | '300' | '400' | '500' | '600' | '70
 // 字体风格
 export type FontStyle = 'normal' | 'italic'
 
-// 元素尺寸类型（支持数字像素值或 'auto'、'100%' 等 CSS 字符串）
-export type SizeValue = number | string
-
 // 元素基础属性
 export interface BaseElement {
   id: string
   type: ElementType
   x: number
   y: number
-  width: SizeValue
-  height: SizeValue
+  width: number
+  height: number
   rotation: number
   zIndex: number
   opacity: number
@@ -62,12 +56,15 @@ export interface TextElement extends BaseElement {
   padding: number
 }
 
+// 图片来源类型
+export type ImageSourceType = 'static' | 'dynamic'
+
 // 图片元素
 export interface ImageElement extends BaseElement {
   type: 'image'
-  srcType: ImageSourceType // static: 静态图片（上传的固定图片），dynamic: 动态图片（根据路径模板生成）
-  src: string // 静态图片的 base64 URL，或动态图片的预览路径
-  pathTemplate: string // 动态图片路径模板，支持 {{列名}} 变量
+  srcType: ImageSourceType
+  src: string
+  pathTemplate: string
   fit: ImageFit
   backgroundColor: string
   borderRadius: number
@@ -89,12 +86,6 @@ export interface PaperConfig {
   gridSize: number
 }
 
-// 底稿配置
-export interface DraftConfig {
-  src: string // 底稿图片 URL（Base64 或普通 URL）
-  opacity: number
-}
-
 // Excel 数据结构
 export interface ExcelData {
   columns: string[]
@@ -110,7 +101,6 @@ export interface ExportConfig {
   startRow: number
   endRow: number
   onePagePerRow: boolean
-  exportWithDraft: boolean
 }
 
 // 字体信息
@@ -118,11 +108,4 @@ export interface FontInfo {
   name: string
   label: string
   category: string
-}
-
-// 照片项（本地临时存储）
-export interface PhotoItem {
-  name: string // 文件名
-  path: string // 相对路径（文件夹名/文件名）
-  url: string // object URL，用于浏览器预览
 }

@@ -10,7 +10,6 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
-  base: './', // 使用相对路径，便于静态部署
   server: {
     host: '0.0.0.0',
     port: 5173,

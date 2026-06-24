@@ -81,9 +81,15 @@ function downloadTemplate(templateId: string, event: Event): void {
               :class="{ loading: loadingId === template.id }"
               @click="selectTemplate(template.id)"
             >
-              <div class="template-icon">{{ template.icon }}</div>
-              <div class="template-name">{{ template.name }}</div>
-              <div class="template-desc">{{ template.description }}</div>
+              <div class="template-icon">
+                {{ template.icon }}
+              </div>
+              <div class="template-name">
+                {{ template.name }}
+              </div>
+              <div class="template-desc">
+                {{ template.description }}
+              </div>
               <button
                 class="btn-download"
                 title="下载示例数据"
@@ -111,10 +117,7 @@ function downloadTemplate(templateId: string, event: Event): void {
 <style scoped>
 .template-modal {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  inset: 0;
   background-color: rgb(0 0 0 / 60%);
   display: flex;
   align-items: center;
@@ -150,7 +153,7 @@ function downloadTemplate(templateId: string, event: Event): void {
 .modal-desc {
   font-size: 14px;
   color: var(--color-text-secondary);
-  margin: 0 0 24px 0;
+  margin: 0 0 24px;
   text-align: center;
 }
 

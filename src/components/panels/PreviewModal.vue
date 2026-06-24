@@ -229,10 +229,7 @@ function handleOverlayClick(e: MouseEvent): void {
 <style scoped>
 .preview-modal {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  inset: 0;
   background-color: rgb(0 0 0 / 80%);
   display: flex;
   flex-direction: column;

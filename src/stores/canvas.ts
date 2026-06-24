@@ -2,12 +2,10 @@ import { defineStore } from "pinia";
 import { computed, ref } from "vue";
 import type {
   CanvasElement,
-  DraftConfig,
   ImageElement,
   PaperConfig,
   TextElement,
 } from "@/types";
-import type { TemplateConfig } from "@/data/templates";
 import {
   createDefaultPaper,
   createImageElement,
@@ -23,7 +21,6 @@ export const useCanvasStore = defineStore("canvas", () => {
   const zoom = ref(1);
   const minZoom = 0.2;
   const maxZoom = 4;
-  const draft = ref<DraftConfig | null>(null);
 
   const selectedElement = computed<CanvasElement | null>(() => {
     if (!selectedId.value) return null;
@@ -59,27 +56,6 @@ export const useCanvasStore = defineStore("canvas", () => {
     elements.value.push(el);
     selectedId.value = el.id;
     return el;
-  }
-
-  // 添加静态图片元素
-  function addStaticImage(src: string): ImageElement {
-    return addImageElement({
-      srcType: "static",
-      src,
-      x: 80,
-      y: 80,
-    });
-  }
-
-  // 添加动态图片元素
-  function addDynamicImage(pathTemplate = ""): ImageElement {
-    return addImageElement({
-      srcType: "dynamic",
-      src: "",
-      pathTemplate,
-      x: 80,
-      y: 80,
-    });
   }
 
   // 更新元素属性
@@ -161,36 +137,6 @@ export const useCanvasStore = defineStore("canvas", () => {
     paper.value = { ...paper.value, ...patch };
   }
 
-  // 设置底稿
-  function setDraft(src: string, opacity = 1): void {
-    draft.value = { src, opacity };
-  }
-
-  // 清除底稿
-  function clearDraft(): void {
-    draft.value = null;
-  }
-
-  // 更新底稿透明度
-  function updateDraftOpacity(opacity: number): void {
-    if (draft.value) {
-      draft.value.opacity = opacity;
-    }
-  }
-
-  // 加载模板
-  function loadTemplate(template: TemplateConfig): void {
-    paper.value = { ...template.paper };
-    elements.value = template.elements.map((el) => ({ ...el }));
-    if (template.draft) {
-      draft.value = { ...template.draft };
-    } else {
-      draft.value = null;
-    }
-    selectedId.value = null;
-    zoom.value = 1;
-  }
-
   return {
     elements,
     selectedId,
@@ -198,14 +144,11 @@ export const useCanvasStore = defineStore("canvas", () => {
     zoom,
     minZoom,
     maxZoom,
-    draft,
     selectedElement,
     sortedElements,
     maxZIndex,
     addTextElement,
     addImageElement,
-    addStaticImage,
-    addDynamicImage,
     updateElement,
     removeElement,
     selectElement,
@@ -218,9 +161,5 @@ export const useCanvasStore = defineStore("canvas", () => {
     zoomOut,
     resetZoom,
     updatePaper,
-    setDraft,
-    clearDraft,
-    updateDraftOpacity,
-    loadTemplate,
   };
 });

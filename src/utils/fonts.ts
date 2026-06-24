@@ -1,17 +1,17 @@
 import type { FontInfo } from '@/types'
 
-// 系统内置字体列表（使用 fallback 兼容不同操作系统）
+// 系统内置字体列表
 export const BUILT_IN_FONTS: FontInfo[] = [
-  { name: 'Microsoft YaHei, PingFang SC, sans-serif', label: '微软雅黑', category: 'sans-serif' },
-  { name: 'SimSun, STSong, serif', label: '宋体', category: 'serif' },
-  { name: 'SimHei, STHeiti, sans-serif', label: '黑体', category: 'sans-serif' },
-  { name: 'KaiTi, STKaiti, Kaiti SC, serif', label: '楷体', category: 'serif' },
-  { name: 'FangSong, STFangsong, serif', label: '仿宋', category: 'serif' },
-  { name: 'Arial, sans-serif', label: 'Arial', category: 'sans-serif' },
-  { name: 'Helvetica, Arial, sans-serif', label: 'Helvetica', category: 'sans-serif' },
-  { name: 'Times New Roman, serif', label: 'Times New Roman', category: 'serif' },
-  { name: 'Georgia, serif', label: 'Georgia', category: 'serif' },
-  { name: 'Courier New, monospace', label: 'Courier New', category: 'monospace' },
+  { name: 'Microsoft YaHei', label: '微软雅黑', category: 'sans-serif' },
+  { name: 'SimSun', label: '宋体', category: 'serif' },
+  { name: 'SimHei', label: '黑体', category: 'sans-serif' },
+  { name: 'KaiTi', label: '楷体', category: 'serif' },
+  { name: 'FangSong', label: '仿宋', category: 'serif' },
+  { name: 'Arial', label: 'Arial', category: 'sans-serif' },
+  { name: 'Helvetica', label: 'Helvetica', category: 'sans-serif' },
+  { name: 'Times New Roman', label: 'Times New Roman', category: 'serif' },
+  { name: 'Georgia', label: 'Georgia', category: 'serif' },
+  { name: 'Courier New', label: 'Courier New', category: 'monospace' },
 ]
 
 // 字号预设

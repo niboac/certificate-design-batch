@@ -4,56 +4,6 @@ import * as XLSX from "xlsx";
 import type { ExcelData } from "@/types";
 import { createDemoData } from "@/utils/demo";
 
-// 将任意编码的 ArrayBuffer 转换为 UTF-8 编码的 ArrayBuffer
-// 解决 CSV 文件 GBK/其他编码导致的中文乱码问题
-function ensureUtf8(buffer: ArrayBuffer): ArrayBuffer {
-  const bytes = new Uint8Array(buffer);
-
-  // 已有 UTF-8 BOM，直接返回
-  if (
-    bytes.length >= 3 &&
-    bytes[0] === 0xef &&
-    bytes[1] === 0xbb &&
-    bytes[2] === 0xbf
-  ) {
-    return buffer;
-  }
-
-  // UTF-16 LE BOM
-  if (
-    bytes.length >= 2 &&
-    bytes[0] === 0xff &&
-    bytes[1] === 0xfe
-  ) {
-    const text = new TextDecoder("utf-16le").decode(bytes.slice(2));
-    return new TextEncoder().encode(text).buffer;
-  }
-
-  // UTF-16 BE BOM
-  if (
-    bytes.length >= 2 &&
-    bytes[0] === 0xfe &&
-    bytes[1] === 0xff
-  ) {
-    const text = new TextDecoder("utf-16be").decode(bytes.slice(2));
-    return new TextEncoder().encode(text).buffer;
-  }
-
-  // 尝试按 UTF-8 解码，若失败则按 GBK 解码
-  try {
-    const text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
-    new TextEncoder().encode(text);
-    return buffer;
-  } catch {
-    try {
-      const text = new TextDecoder("gbk").decode(bytes);
-      return new TextEncoder().encode(text).buffer;
-    } catch {
-      return buffer;
-    }
-  }
-}
-
 // Excel 数据 Store：负责导入与预览
 export const useExcelStore = defineStore("excel", () => {
   const data = ref<ExcelData | null>(null);
@@ -76,14 +26,7 @@ export const useExcelStore = defineStore("excel", () => {
     error.value = "";
     try {
       const buffer = await file.arrayBuffer();
-      // 检测并处理编码：确保以 UTF-8 解析（解决中文乱码问题）
-      const utf8Buffer = ensureUtf8(buffer);
-      const workbook = XLSX.read(utf8Buffer, {
-        type: "array",
-        codepage: 65001, // UTF-8
-        cellText: true,
-        cellDates: true,
-      });
+      const workbook = XLSX.read(buffer, { type: "array" });
       const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
       if (!firstSheet) {
         throw new Error("工作簿中没有可用的表单");

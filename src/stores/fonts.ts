@@ -169,7 +169,7 @@ export const useFontsStore = defineStore('fonts', () => {
         url,
       }
       customFonts.value.push(customFont)
-    } catch (err) {
+    } catch {
       URL.revokeObjectURL(url)
       throw new Error(`字体加载失败: ${file.name}`)
     }

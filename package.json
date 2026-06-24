@@ -8,7 +8,7 @@
     "build": "vue-tsc --noEmit && vite build",
     "prod": "vue-tsc --noEmit && vite build && copyfiles -u 1 dist/**/* dist/index.html docs",
     "preview": "vite preview",
-    "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix --ignore-path .gitignore",
+    "lint": "eslint . --fix",
     "stylelint": "stylelint \"src/**/*.{vue,css,scss}\" --fix",
     "type-check": "vue-tsc --noEmit"
   },

@@ -1,15 +1,11 @@
 <script setup lang="ts">
-import { computed, ref, onMounted, onUnmounted, nextTick, type CSSProperties } from 'vue'
+import { computed, ref, type CSSProperties } from 'vue'
 import { useCanvasStore } from '@/stores/canvas'
-import { useExcelStore } from '@/stores/excel'
 import { unitToPx } from '@/utils/element'
 import CanvasElementVue from './CanvasElement.vue'
-import PreviewModal from '@/components/panels/PreviewModal.vue'
 
 const canvasStore = useCanvasStore()
-const excelStore = useExcelStore()
 const canvasViewport = ref<HTMLElement | null>(null)
-const showPreview = ref(false)
 
 // 稿纸像素尺寸
 const paperSize = computed(() => ({
@@ -17,60 +13,16 @@ const paperSize = computed(() => ({
   height: unitToPx(canvasStore.paper.height, canvasStore.paper.unit),
 }))
 
-// 计算适合视口的缩放比例
-function fitToViewport(): void {
-  if (!canvasViewport.value) return
-  const viewportWidth = canvasViewport.value.clientWidth - 80 // 减去 padding
-  const viewportHeight = canvasViewport.value.clientHeight - 80
-  const { width, height } = paperSize.value
-  const scaleX = viewportWidth / width
-  const scaleY = viewportHeight / height
-  const scale = Math.min(scaleX, scaleY, 1) // 最大不超过 100%
-  canvasStore.setZoom(scale)
-  // 缩放后滚动到画布中心
-  nextTick(() => {
-    if (!canvasViewport.value) return
-    canvasViewport.value.scrollLeft = (canvasViewport.value.scrollWidth - canvasViewport.value.clientWidth) / 2
-    canvasViewport.value.scrollTop = (canvasViewport.value.scrollHeight - canvasViewport.value.clientHeight) / 2
-  })
-}
-
-// ResizeObserver 监听视口大小变化
-let resizeObserver: ResizeObserver | null = null
-
-onMounted(() => {
-  if (canvasViewport.value) {
-    resizeObserver = new ResizeObserver(() => {
-      fitToViewport()
-    })
-    resizeObserver.observe(canvasViewport.value)
-    // 初始化时自动适应
-    fitToViewport()
-  }
-})
-
-onUnmounted(() => {
-  resizeObserver?.disconnect()
-})
-
 // 稿纸样式
 const paperStyle = computed<CSSProperties>(() => ({
   width: `${paperSize.value.width}px`,
   height: `${paperSize.value.height}px`,
   backgroundColor: canvasStore.paper.backgroundColor,
   transform: `scale(${canvasStore.zoom})`,
-  transformOrigin: 'top left',
+  transformOrigin: 'center center',
   position: 'relative',
   boxShadow: '0 4px 24px rgb(0 0 0 / 12%)',
   flexShrink: 0,
-}))
-
-// 稿纸外层容器样式：用于撑开滚动区域，匹配缩放后的画布实际尺寸
-const paperWrapperStyle = computed<CSSProperties>(() => ({
-  width: `${paperSize.value.width * canvasStore.zoom}px`,
-  height: `${paperSize.value.height * canvasStore.zoom}px`,
-  flexShrink: 0,
-  position: 'relative',
 }))
 
 // 网格背景样式
@@ -115,13 +67,6 @@ const zoomPercent = computed(() => Math.round(canvasStore.zoom * 100))
     <!-- 工具栏 -->
     <div class="canvas-toolbar">
       <div class="toolbar-left">
-        <button
-          class="btn btn-primary btn-sm"
-          :disabled="!excelStore.hasData"
-          @click="showPreview = true"
-        >
-          预览
-        </button>
         <span class="paper-size-label">
           {{ canvasStore.paper.width }} × {{ canvasStore.paper.height }}
           {{ canvasStore.paper.unit }}
@@ -158,30 +103,18 @@ const zoomPercent = computed(() => Math.round(canvasStore.zoom * 100))
       @wheel="handleWheel"
     >
       <div
-        class="paper-wrapper"
-        :style="paperWrapperStyle"
+        class="paper"
+        :style="paperStyle"
       >
         <div
-          class="paper"
-          :style="paperStyle"
-        >
-          <div
-            class="grid-layer"
-            :style="gridStyle"
-          />
-          <img
-            v-if="canvasStore.draft"
-            class="draft-layer"
-            :src="canvasStore.draft.src"
-            :style="{ opacity: canvasStore.draft.opacity }"
-            alt="底稿"
-          >
-          <CanvasElementVue
-            v-for="el in canvasStore.sortedElements"
-            :key="el.id"
-            :element="el"
-          />
-        </div>
+          class="grid-layer"
+          :style="gridStyle"
+        />
+        <CanvasElementVue
+          v-for="el in canvasStore.sortedElements"
+          :key="el.id"
+          :element="el"
+        />
       </div>
     </div>
 
@@ -199,11 +132,6 @@ const zoomPercent = computed(() => Math.round(canvasStore.zoom * 100))
         点击元素选中并拖拽 · Ctrl/Cmd + 滚轮缩放
       </span>
     </div>
-
-    <!-- 预览弹窗 -->
-    <PreviewModal
-      v-model:visible="showPreview"
-    />
   </div>
 </template>
 
@@ -233,12 +161,6 @@ const zoomPercent = computed(() => Math.round(canvasStore.zoom * 100))
   font-family: var(--font-mono);
 }
 
-.toolbar-left {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
 .toolbar-right {
   display: flex;
   align-items: center;
@@ -257,34 +179,18 @@ const zoomPercent = computed(() => Math.round(canvasStore.zoom * 100))
   flex: 1;
   overflow: auto;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: center;
   padding: 40px;
 }
 
-.paper-wrapper {
-  /* 容器尺寸由 JS 控制以匹配缩放后的画布大小 */
-}
-
 .paper {
-  position: absolute;
-  top: 0;
-  left: 0;
+  position: relative;
   overflow: hidden;
 }
 
 .grid-layer {
   z-index: 0;
-}
-
-.draft-layer {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  z-index: 1;
 }
 
 .canvas-statusbar {

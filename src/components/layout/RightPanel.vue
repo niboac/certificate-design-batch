@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from "vue";
-import { useCanvasStore } from "@/stores/canvas";
+import { ref } from "vue";
 import ElementLibrary from "@/components/panels/ElementLibrary.vue";
 import StyleEditor from "@/components/panels/StyleEditor.vue";
 import PaperSettings from "@/components/panels/PaperSettings.vue";
@@ -8,7 +7,6 @@ import ExportPanel from "@/components/panels/ExportPanel.vue";
 
 type Tab = "elements" | "style" | "paper" | "export";
 
-const canvasStore = useCanvasStore();
 const activeTab = ref<Tab>("elements");
 
 const tabs: { key: Tab; label: string }[] = [
@@ -17,16 +15,6 @@ const tabs: { key: Tab; label: string }[] = [
   { key: "paper", label: "稿纸" },
   { key: "export", label: "导出" },
 ];
-
-// 选中元素时自动切换到样式面板
-watch(
-  () => canvasStore.selectedId,
-  (newId) => {
-    if (newId) {
-      activeTab.value = "style";
-    }
-  },
-);
 </script>
 
 <template>

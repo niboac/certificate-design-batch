@@ -1,22 +1,10 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed } from 'vue'
 import { useCanvasStore } from '@/stores/canvas'
-import { useExcelStore } from '@/stores/excel'
-import { usePhotosStore } from '@/stores/photos'
-import { useFontsStore } from '@/stores/fonts'
-import { FONT_SIZE_PRESETS } from '@/utils/fonts'
+import { BUILT_IN_FONTS, FONT_SIZE_PRESETS } from '@/utils/fonts'
 import type { CanvasElement, FontWeight, ImageFit, TextAlign } from '@/types'
 
 const canvasStore = useCanvasStore()
-const excelStore = useExcelStore()
-const photosStore = usePhotosStore()
-const fontsStore = useFontsStore()
-const staticImageInput = ref<HTMLInputElement | null>(null)
-
-// 初始化字体列表
-onMounted(() => {
-  fontsStore.init()
-})
 
 const element = computed<CanvasElement | null>(() => canvasStore.selectedElement)
 
@@ -24,22 +12,6 @@ const element = computed<CanvasElement | null>(() => canvasStore.selectedElement
 function update(patch: Partial<CanvasElement>): void {
   if (!element.value) return
   canvasStore.updateElement(element.value.id, patch)
-}
-
-// 更新元素尺寸，支持数字和 'auto'、'100%' 字符串
-function updateSize(
-  key: 'width' | 'height',
-  value: string,
-): void {
-  if (!element.value) return
-  if (value === 'auto' || value === '100%') {
-    canvasStore.updateElement(element.value.id, { [key]: value })
-    return
-  }
-  const num = Number(value)
-  if (!Number.isNaN(num)) {
-    canvasStore.updateElement(element.value.id, { [key]: num })
-  }
 }
 
 // 更新文本属性
@@ -79,93 +51,6 @@ const fitOptions: { value: ImageFit; label: string }[] = [
   { value: 'none', label: '原始' },
   { value: 'scale-down', label: '缩小' },
 ]
-
-// 触发更换静态图片
-function triggerReplaceStaticImage(): void {
-  staticImageInput.value?.click()
-}
-
-// 处理更换静态图片
-function handleReplaceStaticImage(event: Event): void {
-  const target = event.target as HTMLInputElement
-  const file = target.files?.[0]
-  if (!file || !element.value || element.value.type !== 'image') return
-  const reader = new FileReader()
-  reader.onload = () => {
-    const src = reader.result as string
-    canvasStore.updateElement(element.value!.id, { src })
-  }
-  reader.readAsDataURL(file)
-  target.value = ''
-}
-
-// 追加文本到路径模板
-function appendToPathTemplate(text: string): void {
-  if (!element.value || element.value.type !== 'image') return
-  const existing = element.value.pathTemplate
-  canvasStore.updateElement(element.value.id, {
-    pathTemplate: existing + text,
-  })
-}
-
-// 动态图片解析后的路径预览（使用当前行数据）
-const resolvedPathPreview = computed(() => {
-  if (!element.value || element.value.type !== 'image' || element.value.srcType !== 'dynamic') return ''
-  const template = element.value.pathTemplate
-  if (!template) return ''
-  const row = excelStore.currentRow ?? {}
-  return template.replace(/\{\{\s*([^}]+?)\s*\}\}/g, (_match, key: string) => {
-    return row[key.trim()] ?? `{{${key.trim()}}}`
-  })
-})
-
-// 当前路径是否匹配到照片
-const pathMatched = computed(() => {
-  if (!resolvedPathPreview.value) return false
-  return !!photosStore.findPhotoByPath(resolvedPathPreview.value)
-})
-
-// 点击照片路径时插入到模板
-function insertPhotoPath(photoPath: string): void {
-  if (!element.value || element.value.type !== 'image') return
-  canvasStore.updateElement(element.value.id, {
-    pathTemplate: photoPath,
-  })
-}
-
-// 自定义字体上传相关
-const customFontInput = ref<HTMLInputElement | null>(null)
-const fontUploadError = ref('')
-
-function triggerUploadFont(): void {
-  customFontInput.value?.click()
-}
-
-async function handleUploadFont(event: Event): Promise<void> {
-  const target = event.target as HTMLInputElement
-  const file = target.files?.[0]
-  if (!file) return
-
-  fontUploadError.value = ''
-  const validExtensions = ['.ttf', '.otf', '.woff', '.woff2']
-  const ext = file.name.toLowerCase().slice(file.name.lastIndexOf('.'))
-  if (!validExtensions.includes(ext)) {
-    fontUploadError.value = '仅支持 ttf, otf, woff, woff2 格式'
-    target.value = ''
-    return
-  }
-
-  try {
-    await fontsStore.addCustomFont(file)
-  } catch (err) {
-    fontUploadError.value = err instanceof Error ? err.message : '字体加载失败'
-  }
-  target.value = ''
-}
-
-function handleRemoveCustomFont(fontName: string): void {
-  fontsStore.removeCustomFont(fontName)
-}
 </script>
 
 <template>
@@ -205,24 +90,20 @@ function handleRemoveCustomFont(fontName: string): void {
           <div class="form-item">
             <label class="form-label">宽度</label>
             <input
+              type="number"
               class="form-input"
               :value="element.width"
-              @input="updateSize('width', ($event.target as HTMLInputElement).value)"
+              @input="update({ width: Number(($event.target as HTMLInputElement).value) })"
             >
-            <p class="form-hint">
-              支持数字、auto、100%
-            </p>
           </div>
           <div class="form-item">
             <label class="form-label">高度</label>
             <input
+              type="number"
               class="form-input"
               :value="element.height"
-              @input="updateSize('height', ($event.target as HTMLInputElement).value)"
+              @input="update({ height: Number(($event.target as HTMLInputElement).value) })"
             >
-            <p class="form-hint">
-              支持数字、auto、100%
-            </p>
           </div>
           <div class="form-item">
             <label class="form-label">旋转</label>
@@ -272,84 +153,22 @@ function handleRemoveCustomFont(fontName: string): void {
           <h3 class="panel-title">
             字体设置
           </h3>
-
-          <!-- 自定义字体上传 -->
-          <div
-            v-if="fontsStore.customFonts.length > 0"
-            class="custom-fonts-section"
-          >
-            <label class="form-label">已上传字体</label>
-            <div class="custom-font-list">
-              <div
-                v-for="font in fontsStore.customFonts"
-                :key="font.name"
-                class="custom-font-item"
-              >
-                <span :style="{ fontFamily: font.name }">{{ font.label }}</span>
-                <button
-                  class="btn-remove"
-                  title="移除"
-                  @click="handleRemoveCustomFont(font.name)"
-                >
-                  ×
-                </button>
-              </div>
-            </div>
-          </div>
-
           <div class="form-item">
-            <div class="form-label-row">
-              <label class="form-label">字体</label>
-              <button
-                class="btn-upload-font"
-                @click="triggerUploadFont"
-              >
-                上传字体
-              </button>
-              <input
-                ref="customFontInput"
-                type="file"
-                accept=".ttf,.otf,.woff,.woff2"
-                hidden
-                @change="handleUploadFont"
-              >
-            </div>
-            <p
-              v-if="fontUploadError"
-              class="form-error"
-            >
-              {{ fontUploadError }}
-            </p>
+            <label class="form-label">字体</label>
             <select
-              class="form-select font-select"
+              class="form-select"
               :value="element.fontFamily"
               @change="updateText({ fontFamily: ($event.target as HTMLSelectElement).value })"
             >
-              <!-- 自定义字体分组 -->
               <optgroup
-                v-if="fontsStore.customFonts.length > 0"
-                label="自定义字体"
-              >
-                <option
-                  v-for="font in fontsStore.customFonts"
-                  :key="font.name"
-                  :value="font.name"
-                  :style="{ fontFamily: font.name }"
-                >
-                  {{ font.label }}
-                </option>
-              </optgroup>
-              <!-- 系统字体分组 -->
-              <optgroup
-                v-for="group in ['serif', 'sans-serif', 'monospace', 'cursive', 'other']"
+                v-for="group in ['sans-serif', 'serif', 'monospace']"
                 :key="group"
-                :label="group === 'serif' ? '衬线字体' : group === 'sans-serif' ? '无衬线字体' : group === 'monospace' ? '等宽字体' : group === 'cursive' ? '手写字体' : '其他字体'"
+                :label="group"
               >
                 <option
-                  v-for="font in fontsStore.fonts.filter((f) => f.category === group)"
+                  v-for="font in BUILT_IN_FONTS.filter((f) => f.category === group)"
                   :key="font.name"
                   :value="font.name"
-                  :style="{ fontFamily: font.name }"
                 >
                   {{ font.label }}
                 </option>
@@ -504,182 +323,6 @@ function handleRemoveCustomFont(fontName: string): void {
         <div class="panel-section">
           <h3 class="panel-title">
             图片设置
-            <span class="subtitle">
-              {{ element.srcType === 'static' ? '静态图片' : '动态图片' }}
-            </span>
-          </h3>
-
-          <!-- 静态图片 -->
-          <template v-if="element.srcType === 'static'">
-            <div
-              v-if="element.src"
-              class="image-preview"
-            >
-              <img
-                :src="element.src"
-                alt="预览"
-              >
-            </div>
-            <button
-              class="btn btn-default btn-sm btn-block"
-              @click="triggerReplaceStaticImage"
-            >
-              更换图片
-            </button>
-            <input
-              ref="staticImageInput"
-              type="file"
-              accept="image/*"
-              style="display: none"
-              @change="handleReplaceStaticImage"
-            >
-          </template>
-
-          <!-- 动态图片 -->
-          <template v-else>
-            <div class="form-item">
-              <label class="form-label">路径模板</label>
-              <textarea
-                class="form-textarea path-editor"
-                rows="2"
-                :value="element.pathTemplate"
-                placeholder="例如: photos/{{姓名}}.jpg"
-                @input="updateImage({ pathTemplate: ($event.target as HTMLTextAreaElement).value })"
-              />
-              <div class="path-tips">
-                <div class="path-tip-title">
-                  路径写法说明：
-                </div>
-                <ul class="path-tip-list">
-                  <li><code v-text="'{{姓名}}'" /> — 引用 Excel 中"姓名"列的值</li>
-                  <li><code>photos/</code> — 文件夹前缀（与上传时的文件夹结构一致）</li>
-                  <li><code>.jpg</code> — 文件后缀，需与照片实际格式一致</li>
-                </ul>
-              </div>
-            </div>
-
-            <!-- 快速插入：变量 -->
-            <div
-              v-if="excelStore.hasData"
-              class="form-item"
-            >
-              <label class="form-label">Excel 变量（点击插入）</label>
-              <div class="quick-insert-row">
-                <button
-                  v-for="col in excelStore.columns"
-                  :key="col"
-                  class="quick-btn"
-                  @click="appendToPathTemplate(`{{${col}}}`)"
-                >
-                  {{ col }}
-                </button>
-              </div>
-            </div>
-
-            <!-- 快速插入：常用后缀和分隔符 -->
-            <div class="form-item">
-              <label class="form-label">常用字符（点击插入）</label>
-              <div class="quick-insert-row">
-                <button
-                  class="quick-btn"
-                  @click="appendToPathTemplate('/')"
-                >
-                  /
-                </button>
-                <button
-                  class="quick-btn"
-                  @click="appendToPathTemplate('.jpg')"
-                >
-                  .jpg
-                </button>
-                <button
-                  class="quick-btn"
-                  @click="appendToPathTemplate('.png')"
-                >
-                  .png
-                </button>
-                <button
-                  class="quick-btn"
-                  @click="appendToPathTemplate('.jpeg')"
-                >
-                  .jpeg
-                </button>
-                <button
-                  class="quick-btn"
-                  @click="appendToPathTemplate('-')"
-                >
-                  -
-                </button>
-                <button
-                  class="quick-btn"
-                  @click="appendToPathTemplate('_')"
-                >
-                  _
-                </button>
-              </div>
-            </div>
-
-            <!-- 解析预览 -->
-            <div
-              v-if="element.pathTemplate"
-              class="form-item"
-            >
-              <label class="form-label">当前行解析结果</label>
-              <div
-                class="resolved-path"
-                :class="{ matched: pathMatched, 'not-matched': !pathMatched && resolvedPathPreview }"
-              >
-                <span
-                  v-if="resolvedPathPreview"
-                  class="resolved-path-text"
-                >{{ resolvedPathPreview }}</span>
-                <span
-                  v-else
-                  class="resolved-path-empty"
-                >等待解析...</span>
-                <span
-                  v-if="pathMatched"
-                  class="match-badge success"
-                >✓ 已匹配</span>
-                <span
-                  v-else-if="resolvedPathPreview"
-                  class="match-badge fail"
-                >✗ 未匹配</span>
-              </div>
-            </div>
-
-            <!-- 可用照片列表（点击填充路径） -->
-            <div
-              v-if="photosStore.hasPhotos"
-              class="form-item"
-            >
-              <label class="form-label">
-                可用照片（{{ photosStore.totalPhotos }} 张，点击填入路径）
-              </label>
-              <div class="photo-path-list">
-                <button
-                  v-for="photo in photosStore.photos.slice(0, 50)"
-                  :key="photo.path"
-                  class="photo-path-btn"
-                  :title="photo.path"
-                  @click="insertPhotoPath(photo.path)"
-                >
-                  {{ photo.path }}
-                </button>
-                <div
-                  v-if="photosStore.totalPhotos > 50"
-                  class="photo-path-more"
-                >
-                  ... 还有 {{ photosStore.totalPhotos - 50 }} 张
-                </div>
-              </div>
-            </div>
-          </template>
-        </div>
-
-        <div class="panel-section">
-          <h3 class="panel-title">
-            显示设置
           </h3>
           <div class="form-item">
             <label class="form-label">填充方式</label>
@@ -834,21 +477,6 @@ function handleRemoveCustomFont(fontName: string): void {
   color: var(--color-text-tertiary);
 }
 
-.loading-hint,
-.api-hint {
-  font-size: 11px;
-  color: var(--color-text-tertiary);
-  margin-left: 6px;
-}
-
-.api-hint.success {
-  color: #16a34a;
-}
-
-.font-select {
-  max-height: 300px;
-}
-
 .btn-group {
   display: flex;
   gap: 4px;
@@ -892,260 +520,5 @@ function handleRemoveCustomFont(fontName: string): void {
 
 .form-item input[type='checkbox'] {
   cursor: pointer;
-}
-
-.image-preview {
-  margin-bottom: 10px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-  max-height: 150px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: #f9fafb;
-}
-
-.image-preview img {
-  max-width: 100%;
-  max-height: 150px;
-  display: block;
-}
-
-.btn-block {
-  width: 100%;
-}
-
-.subtitle {
-  font-size: 11px;
-  font-weight: normal;
-  color: var(--color-text-tertiary);
-  margin-left: 6px;
-}
-
-.path-editor {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  resize: vertical;
-}
-
-.path-tips {
-  margin-top: 8px;
-  padding: 8px 10px;
-  background-color: #f9fafb;
-  border-radius: var(--radius-sm);
-  border-left: 3px solid var(--color-primary);
-}
-
-.path-tip-title {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--color-text);
-  margin-bottom: 4px;
-}
-
-.path-tip-list {
-  margin: 0;
-  padding-left: 16px;
-  font-size: 11px;
-  color: var(--color-text-secondary);
-  line-height: 1.6;
-}
-
-.path-tip-list code {
-  padding: 1px 4px;
-  background-color: #e5e7eb;
-  border-radius: 3px;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--color-danger);
-}
-
-.quick-insert-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-
-.quick-btn {
-  padding: 3px 8px;
-  background-color: #f3f4f6;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  font-size: 11px;
-  font-family: var(--font-mono);
-  color: var(--color-text);
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.quick-btn:hover {
-  border-color: var(--color-primary);
-  color: var(--color-primary);
-  background-color: var(--color-primary-light);
-}
-
-.resolved-path {
-  padding: 8px 10px;
-  border-radius: var(--radius-sm);
-  font-size: 12px;
-  font-family: var(--font-mono);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background-color: #f9fafb;
-  border: 1px solid var(--color-border);
-  word-break: break-all;
-}
-
-.resolved-path.matched {
-  background-color: #f0fdf4;
-  border-color: #22c55e;
-}
-
-.resolved-path.not-matched {
-  background-color: #fef2f2;
-  border-color: #ef4444;
-}
-
-.resolved-path-text {
-  flex: 1;
-  color: var(--color-text);
-}
-
-.resolved-path-empty {
-  color: var(--color-text-tertiary);
-}
-
-.match-badge {
-  font-size: 11px;
-  font-weight: 600;
-  padding: 2px 6px;
-  border-radius: 4px;
-  flex-shrink: 0;
-}
-
-.match-badge.success {
-  color: #16a34a;
-  background-color: #dcfce7;
-}
-
-.match-badge.fail {
-  color: #dc2626;
-  background-color: #fee2e2;
-}
-
-.photo-path-list {
-  max-height: 200px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  padding: 4px;
-}
-
-.photo-path-btn {
-  display: block;
-  width: 100%;
-  text-align: left;
-  padding: 6px 8px;
-  background: none;
-  border: none;
-  border-radius: 3px;
-  font-size: 11px;
-  font-family: var(--font-mono);
-  color: var(--color-text-secondary);
-  cursor: pointer;
-  transition: all 0.1s ease;
-  word-break: break-all;
-  line-height: 1.4;
-}
-
-.photo-path-btn:hover {
-  background-color: var(--color-primary-light);
-  color: var(--color-primary);
-}
-
-.photo-path-more {
-  padding: 4px 8px;
-  font-size: 11px;
-  color: var(--color-text-tertiary);
-  text-align: center;
-}
-
-.form-label-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.btn-upload-font {
-  padding: 2px 8px;
-  font-size: 11px;
-  border: 1px solid var(--color-primary);
-  border-radius: var(--radius-sm);
-  background-color: var(--color-primary-light);
-  color: var(--color-primary);
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.btn-upload-font:hover {
-  background-color: var(--color-primary);
-  color: #fff;
-}
-
-.form-error {
-  margin-top: 4px;
-  font-size: 11px;
-  color: var(--color-danger);
-}
-
-.custom-fonts-section {
-  margin-bottom: 12px;
-  padding: 8px 10px;
-  background-color: #f9fafb;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--color-border);
-}
-
-.custom-font-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 6px;
-}
-
-.custom-font-item {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 8px;
-  background-color: #fff;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  font-size: 12px;
-}
-
-.btn-remove {
-  width: 16px;
-  height: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  border-radius: 50%;
-  background-color: #fee2e2;
-  color: #dc2626;
-  font-size: 12px;
-  line-height: 1;
-  cursor: pointer;
-  transition: background-color 0.15s ease;
-}
-
-.btn-remove:hover {
-  background-color: #fecaca;
 }
 </style>

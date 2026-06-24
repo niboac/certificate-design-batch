@@ -179,7 +179,16 @@ function handleMouseUp(): void {
 // 缩放手柄拖拽
 type ResizeHandle = "nw" | "ne" | "sw" | "se" | "n" | "s" | "e" | "w";
 
-let resizeStart = {
+interface ResizeStart {
+  x: number
+  y: number
+  elX: number
+  elY: number
+  elW: number
+  elH: number
+}
+
+let resizeStart: ResizeStart = {
   x: 0,
   y: 0,
   elX: 0,
@@ -198,8 +207,8 @@ function handleResizeStart(event: MouseEvent, handle: ResizeHandle): void {
     y: event.clientY,
     elX: props.element.x,
     elY: props.element.y,
-    elW: props.element.width,
-    elH: props.element.height,
+    elW: typeof props.element.width === "number" ? props.element.width : 0,
+    elH: typeof props.element.height === "number" ? props.element.height : 0,
   };
 
   const onMove = (e: MouseEvent) => handleResizeMove(e, handle);
@@ -361,7 +370,7 @@ function handleResizeMove(event: MouseEvent, handle: ResizeHandle): void {
   resize: none;
   box-sizing: border-box;
   white-space: pre-wrap;
-  word-break: break-word;
+  word-break: break-all;
   overflow: hidden;
 }
 

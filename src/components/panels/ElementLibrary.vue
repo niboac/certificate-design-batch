@@ -5,7 +5,7 @@ import { useExcelStore } from '@/stores/excel'
 
 const canvasStore = useCanvasStore()
 const excelStore = useExcelStore()
-const staticImageInput = ref<HTMLInputElement | null>(null)
+const imageInput = ref<HTMLInputElement | null>(null)
 
 // 添加文本元素
 function addText(): void {
@@ -16,29 +16,23 @@ function addText(): void {
   })
 }
 
-// 触发静态图片上传
-function triggerStaticImage(): void {
-  staticImageInput.value?.click()
+// 触发图片上传
+function triggerImage(): void {
+  imageInput.value?.click()
 }
 
-// 处理静态图片上传
-function handleStaticImageChange(event: Event): void {
+// 处理图片上传
+function handleImageChange(event: Event): void {
   const target = event.target as HTMLInputElement
   const file = target.files?.[0]
   if (!file) return
   const reader = new FileReader()
   reader.onload = () => {
     const src = reader.result as string
-    canvasStore.addStaticImage(src)
+    canvasStore.addImageElement({ src, x: 80, y: 80 })
   }
   reader.readAsDataURL(file)
   target.value = ''
-}
-
-// 添加动态图片元素
-function addDynamicImage(): void {
-  const defaultTemplate = excelStore.hasData ? `{{${excelStore.columns[0]}}}.jpg` : ''
-  canvasStore.addDynamicImage(defaultTemplate)
 }
 
 // 添加变量文本（快速插入）
@@ -69,28 +63,19 @@ function addVariableText(col: string): void {
         </button>
         <button
           class="add-btn"
-          @click="triggerStaticImage"
+          @click="triggerImage"
         >
           <div class="add-icon">
             □
           </div>
-          <span>静态图片</span>
-        </button>
-        <button
-          class="add-btn"
-          @click="addDynamicImage"
-        >
-          <div class="add-icon">
-            ⚙
-          </div>
-          <span>动态图片</span>
+          <span>图片</span>
         </button>
         <input
-          ref="staticImageInput"
+          ref="imageInput"
           type="file"
           accept="image/*"
           style="display: none"
-          @change="handleStaticImageChange"
+          @change="handleImageChange"
         >
       </div>
     </div>
@@ -133,14 +118,13 @@ function addVariableText(col: string): void {
           @click="canvasStore.selectElement(el.id)"
         >
           <span class="element-type">
-            {{ el.type === 'text' ? 'T' : el.srcType === 'static' ? '□' : '⚙' }}
+            {{ el.type === 'text' ? 'T' : '□' }}
           </span>
           <span class="element-name">
             <template v-if="el.type === 'text'">
               {{ el.content.slice(0, 20) || '空文本' }}
             </template>
-            <template v-else-if="el.srcType === 'static'">静态图片</template>
-            <template v-else>动态图片</template>
+            <template v-else>图片元素</template>
           </span>
           <div class="element-actions">
             <button
@@ -171,7 +155,7 @@ function addVariableText(col: string): void {
 
 .add-buttons {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: 1fr 1fr;
   gap: 8px;
 }
 
