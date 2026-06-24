@@ -142,12 +142,18 @@ export const useCanvasStore = defineStore("canvas", () => {
 
   // 设置底稿
   function setDraft(config: DraftConfig | null): void {
-    draft.value = config;
+    draft.value = config
+  }
+
+  // 更新底稿透明度
+  function updateDraftOpacity(opacity: number): void {
+    if (!draft.value) return
+    draft.value = { ...draft.value, opacity }
   }
 
   // 清除底稿
   function clearDraft(): void {
-    draft.value = null;
+    draft.value = null
   }
 
   // 加载模板
@@ -192,6 +198,7 @@ export const useCanvasStore = defineStore("canvas", () => {
     resetZoom,
     updatePaper,
     setDraft,
+    updateDraftOpacity,
     clearDraft,
     loadTemplate,
   };

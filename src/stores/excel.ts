@@ -3,6 +3,7 @@ import { ref, computed } from "vue";
 import * as XLSX from "xlsx";
 import type { ExcelData } from "@/types";
 import { createDemoData } from "@/utils/demo";
+import { ensureUtf8 } from "@/utils/encoding";
 
 // Excel 数据 Store：负责导入与预览
 export const useExcelStore = defineStore("excel", () => {
@@ -25,7 +26,11 @@ export const useExcelStore = defineStore("excel", () => {
     loading.value = true;
     error.value = "";
     try {
-      const buffer = await file.arrayBuffer();
+      let buffer = await file.arrayBuffer();
+      const isCsv = /\.csv$/i.test(file.name);
+      if (isCsv) {
+        buffer = ensureUtf8(buffer);
+      }
       const workbook = XLSX.read(buffer, { type: "array" });
       const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
       if (!firstSheet) {

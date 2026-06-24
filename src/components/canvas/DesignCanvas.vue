@@ -1,31 +1,39 @@
 <script setup lang="ts">
 import { computed, ref, type CSSProperties } from 'vue'
 import { useCanvasStore } from '@/stores/canvas'
+import { useExcelStore } from '@/stores/excel'
 import { unitToPx } from '@/utils/element'
 import CanvasElementVue from './CanvasElement.vue'
+import PreviewModal from '@/components/panels/PreviewModal.vue'
 
 const canvasStore = useCanvasStore()
+const excelStore = useExcelStore()
 const canvasViewport = ref<HTMLElement | null>(null)
+const showPreview = ref(false)
 
-// 稿纸像素尺寸
 const paperSize = computed(() => ({
   width: unitToPx(canvasStore.paper.width, canvasStore.paper.unit),
   height: unitToPx(canvasStore.paper.height, canvasStore.paper.unit),
 }))
 
-// 稿纸样式
+const paperWrapperStyle = computed<CSSProperties>(() => ({
+  width: `${paperSize.value.width * canvasStore.zoom}px`,
+  height: `${paperSize.value.height * canvasStore.zoom}px`,
+  flexShrink: 0,
+}))
+
 const paperStyle = computed<CSSProperties>(() => ({
   width: `${paperSize.value.width}px`,
   height: `${paperSize.value.height}px`,
   backgroundColor: canvasStore.paper.backgroundColor,
   transform: `scale(${canvasStore.zoom})`,
-  transformOrigin: 'center center',
-  position: 'relative',
+  transformOrigin: 'top left',
+  position: 'absolute',
+  left: 0,
+  top: 0,
   boxShadow: '0 4px 24px rgb(0 0 0 / 12%)',
-  flexShrink: 0,
 }))
 
-// 网格背景样式
 const gridStyle = computed<CSSProperties>(() => {
   if (!canvasStore.paper.showGrid) return { display: 'none' }
   const size = canvasStore.paper.gridSize
@@ -42,14 +50,27 @@ const gridStyle = computed<CSSProperties>(() => {
   }
 })
 
-// 点击空白处取消选中
+const draftStyle = computed<CSSProperties>(() => {
+  if (!canvasStore.draft) return { display: 'none' }
+  return {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    width: '100%',
+    height: '100%',
+    opacity: canvasStore.draft.opacity,
+    pointerEvents: 'none',
+    zIndex: 0,
+    objectFit: 'fill',
+  }
+})
+
 function handleViewportClick(event: MouseEvent): void {
   if (event.target === event.currentTarget) {
     canvasStore.selectElement(null)
   }
 }
 
-// 滚轮缩放
 function handleWheel(event: WheelEvent): void {
   if (event.ctrlKey || event.metaKey) {
     event.preventDefault()
@@ -58,7 +79,6 @@ function handleWheel(event: WheelEvent): void {
   }
 }
 
-// 缩放百分比
 const zoomPercent = computed(() => Math.round(canvasStore.zoom * 100))
 </script>
 
@@ -67,6 +87,13 @@ const zoomPercent = computed(() => Math.round(canvasStore.zoom * 100))
     <!-- 工具栏 -->
     <div class="canvas-toolbar">
       <div class="toolbar-left">
+        <button
+          class="btn btn-primary btn-sm"
+          :disabled="!excelStore.hasData"
+          @click="showPreview = true"
+        >
+          预览
+        </button>
         <span class="paper-size-label">
           {{ canvasStore.paper.width }} × {{ canvasStore.paper.height }}
           {{ canvasStore.paper.unit }}
@@ -95,7 +122,6 @@ const zoomPercent = computed(() => Math.round(canvasStore.zoom * 100))
       </div>
     </div>
 
-    <!-- 画布视口 -->
     <div
       ref="canvasViewport"
       class="canvas-viewport"
@@ -103,22 +129,33 @@ const zoomPercent = computed(() => Math.round(canvasStore.zoom * 100))
       @wheel="handleWheel"
     >
       <div
-        class="paper"
-        :style="paperStyle"
+        class="paper-wrapper"
+        :style="paperWrapperStyle"
       >
         <div
-          class="grid-layer"
-          :style="gridStyle"
-        />
-        <CanvasElementVue
-          v-for="el in canvasStore.sortedElements"
-          :key="el.id"
-          :element="el"
-        />
+          class="paper"
+          :style="paperStyle"
+        >
+          <div
+            class="grid-layer"
+            :style="gridStyle"
+          />
+          <img
+            v-if="canvasStore.draft"
+            class="draft-layer"
+            :src="canvasStore.draft.src"
+            :style="draftStyle"
+            alt="底稿"
+          >
+          <CanvasElementVue
+            v-for="el in canvasStore.sortedElements"
+            :key="el.id"
+            :element="el"
+          />
+        </div>
       </div>
     </div>
 
-    <!-- 底部状态栏 -->
     <div class="canvas-statusbar">
       <span v-if="canvasStore.selectedElement">
         已选中：{{ canvasStore.selectedElement.type === 'text' ? '文本' : '图片' }}
@@ -132,6 +169,11 @@ const zoomPercent = computed(() => Math.round(canvasStore.zoom * 100))
         点击元素选中并拖拽 · Ctrl/Cmd + 滚轮缩放
       </span>
     </div>
+
+    <!-- 预览弹窗 -->
+    <PreviewModal
+      v-model:visible="showPreview"
+    />
   </div>
 </template>
 
@@ -161,6 +203,12 @@ const zoomPercent = computed(() => Math.round(canvasStore.zoom * 100))
   font-family: var(--font-mono);
 }
 
+.toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .toolbar-right {
   display: flex;
   align-items: center;
@@ -179,17 +227,25 @@ const zoomPercent = computed(() => Math.round(canvasStore.zoom * 100))
   flex: 1;
   overflow: auto;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  align-items: flex-start;
+  justify-content: flex-start;
   padding: 40px;
 }
 
-.paper {
+.paper-wrapper {
   position: relative;
+}
+
+.paper {
+  position: absolute;
   overflow: hidden;
 }
 
 .grid-layer {
+  z-index: 0;
+}
+
+.draft-layer {
   z-index: 0;
 }
 

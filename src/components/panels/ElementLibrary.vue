@@ -16,12 +16,12 @@ function addText(): void {
   })
 }
 
-// 触发图片上传
-function triggerImage(): void {
+// 触发静态图片上传
+function triggerStaticImage(): void {
   imageInput.value?.click()
 }
 
-// 处理图片上传
+// 处理静态图片上传
 function handleImageChange(event: Event): void {
   const target = event.target as HTMLInputElement
   const file = target.files?.[0]
@@ -29,10 +29,26 @@ function handleImageChange(event: Event): void {
   const reader = new FileReader()
   reader.onload = () => {
     const src = reader.result as string
-    canvasStore.addImageElement({ src, x: 80, y: 80 })
+    canvasStore.addImageElement({
+      srcType: 'static',
+      src,
+      x: 80,
+      y: 80,
+    })
   }
   reader.readAsDataURL(file)
   target.value = ''
+}
+
+// 添加动态图片
+function addDynamicImage(): void {
+  canvasStore.addImageElement({
+    srcType: 'dynamic',
+    src: '',
+    pathTemplate: '',
+    x: 80,
+    y: 80,
+  })
 }
 
 // 添加变量文本（快速插入）
@@ -63,12 +79,21 @@ function addVariableText(col: string): void {
         </button>
         <button
           class="add-btn"
-          @click="triggerImage"
+          @click="triggerStaticImage"
         >
           <div class="add-icon">
             □
           </div>
-          <span>图片</span>
+          <span>静态图片</span>
+        </button>
+        <button
+          class="add-btn"
+          @click="addDynamicImage"
+        >
+          <div class="add-icon">
+            ⚙
+          </div>
+          <span>动态图片</span>
         </button>
         <input
           ref="imageInput"
@@ -155,7 +180,7 @@ function addVariableText(col: string): void {
 
 .add-buttons {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr;
   gap: 8px;
 }
 

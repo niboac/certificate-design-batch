@@ -5,6 +5,7 @@ import vue from '@vitejs/plugin-vue'
 // Vite 配置：启用 Vue 插件与路径别名
 export default defineConfig({
   plugins: [vue()],
+  base: './',
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),

@@ -2,11 +2,20 @@
 import { ref } from "vue";
 import { useExcelStore } from "@/stores/excel";
 import { useCanvasStore } from "@/stores/canvas";
+import PhotoLibrary from "@/components/panels/PhotoLibrary.vue";
+
+type Tab = "data" | "photos";
 
 const excelStore = useExcelStore();
 const canvasStore = useCanvasStore();
+const activeTab = ref<Tab>("data");
 const fileInput = ref<HTMLInputElement | null>(null);
 const dragOver = ref(false);
+
+const tabs: { key: Tab; label: string }[] = [
+  { key: "data", label: "数据" },
+  { key: "photos", label: "照片" },
+];
 
 // 触发文件选择
 function triggerImport(): void {
@@ -60,161 +69,185 @@ function nextRow(): void {
 
 <template>
   <aside class="left-panel">
-    <!-- 导入区 -->
-    <div class="panel-section">
-      <h3 class="panel-title">
-        数据导入
-      </h3>
-
-      <div
-        class="drop-zone"
-        :class="{ active: dragOver }"
-        @click="triggerImport"
-        @dragover.prevent="dragOver = true"
-        @dragleave="dragOver = false"
-        @drop.prevent="handleDrop"
+    <!-- 标签页头 -->
+    <div class="tab-header">
+      <button
+        v-for="tab in tabs"
+        :key="tab.key"
+        class="tab-btn"
+        :class="{ active: activeTab === tab.key }"
+        @click="activeTab = tab.key"
       >
-        <div class="drop-icon">
-          +
-        </div>
-        <p class="drop-text">
-          点击或拖拽 Excel 文件到此
-        </p>
-        <p class="drop-hint">
-          支持 .xlsx / .xls / .csv
-        </p>
-      </div>
-      <input
-        ref="fileInput"
-        type="file"
-        accept=".xlsx,.xls,.csv"
-        style="display: none"
-        @change="handleFileChange"
-      >
-
-      <div
-        v-if="excelStore.loading"
-        class="status-tip"
-      >
-        导入中...
-      </div>
-      <div
-        v-if="excelStore.error"
-        class="status-tip error"
-      >
-        {{ excelStore.error }}
-      </div>
-
-      <div
-        v-if="excelStore.hasData"
-        class="file-info"
-      >
-        <span class="file-name">{{ excelStore.data?.fileName }}</span>
-        <button
-          class="btn btn-ghost btn-sm"
-          @click="excelStore.clear"
-        >
-          清除
-        </button>
-      </div>
+        {{ tab.label }}
+      </button>
     </div>
 
-    <!-- 变量列表 -->
-    <div
-      v-if="excelStore.hasData"
-      class="panel-section"
-    >
-      <h3 class="panel-title">
-        可用变量
-      </h3>
-      <p class="section-hint">
-        点击变量插入到选中的文本元素
-      </p>
-      <div class="var-list">
-        <button
-          v-for="col in excelStore.columns"
-          :key="col"
-          class="var-chip"
-          @click="insertVar(col)"
-        >
-          {{ col }}
-        </button>
-      </div>
-    </div>
+    <!-- 标签页内容 -->
+    <div class="tab-content">
+      <!-- 数据标签页 -->
+      <div v-show="activeTab === 'data'">
+        <!-- 导入区 -->
+        <div class="panel-section">
+          <h3 class="panel-title">
+            数据导入
+          </h3>
 
-    <!-- 数据预览 -->
-    <div
-      v-if="excelStore.hasData"
-      class="panel-section preview-section"
-    >
-      <div class="preview-header">
-        <h3 class="panel-title">
-          数据预览
-        </h3>
-        <span class="row-info">
-          {{ excelStore.currentRowIndex + 1 }} / {{ excelStore.totalRows }}
-        </span>
-      </div>
+          <div
+            class="drop-zone"
+            :class="{ active: dragOver }"
+            @click="triggerImport"
+            @dragover.prevent="dragOver = true"
+            @dragleave="dragOver = false"
+            @drop.prevent="handleDrop"
+          >
+            <div class="drop-icon">
+              +
+            </div>
+            <p class="drop-text">
+              点击或拖拽 Excel 文件到此
+            </p>
+            <p class="drop-hint">
+              支持 .xlsx / .xls / .csv
+            </p>
+          </div>
+          <input
+            ref="fileInput"
+            type="file"
+            accept=".xlsx,.xls,.csv"
+            style="display: none"
+            @change="handleFileChange"
+          >
 
-      <div class="row-nav">
-        <button
-          class="btn btn-default btn-sm"
-          :disabled="excelStore.currentRowIndex === 0"
-          @click="prevRow"
-        >
-          上一行
-        </button>
-        <button
-          class="btn btn-default btn-sm"
-          :disabled="excelStore.currentRowIndex >= excelStore.totalRows - 1"
-          @click="nextRow"
-        >
-          下一行
-        </button>
-      </div>
+          <div
+            v-if="excelStore.loading"
+            class="status-tip"
+          >
+            导入中...
+          </div>
+          <div
+            v-if="excelStore.error"
+            class="status-tip error"
+          >
+            {{ excelStore.error }}
+          </div>
 
-      <div class="data-table-wrapper">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th class="col-index">
-                #
-              </th>
-              <th
-                v-for="col in excelStore.columns"
-                :key="col"
-              >
-                {{ col }}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr
-              v-for="(row, index) in excelStore.rows.slice(0, 100)"
-              :key="index"
-              :class="{ active: index === excelStore.currentRowIndex }"
-              @click="excelStore.setCurrentRow(index)"
+          <div
+            v-if="excelStore.hasData"
+            class="file-info"
+          >
+            <span class="file-name">{{ excelStore.data?.fileName }}</span>
+            <button
+              class="btn btn-ghost btn-sm"
+              @click="excelStore.clear"
             >
-              <td class="col-index">
-                {{ index + 1 }}
-              </td>
-              <td
-                v-for="col in excelStore.columns"
-                :key="col"
-                :title="row[col]"
-              >
-                {{ row[col] }}
-              </td>
-            </tr>
-          </tbody>
-        </table>
+              清除
+            </button>
+          </div>
+        </div>
+
+        <!-- 变量列表 -->
+        <div
+          v-if="excelStore.hasData"
+          class="panel-section"
+        >
+          <h3 class="panel-title">
+            可用变量
+          </h3>
+          <p class="section-hint">
+            点击变量插入到选中的文本元素
+          </p>
+          <div class="var-list">
+            <button
+              v-for="col in excelStore.columns"
+              :key="col"
+              class="var-chip"
+              @click="insertVar(col)"
+            >
+              {{ col }}
+            </button>
+          </div>
+        </div>
+
+        <!-- 数据预览 -->
+        <div
+          v-if="excelStore.hasData"
+          class="panel-section preview-section"
+        >
+          <div class="preview-header">
+            <h3 class="panel-title">
+              数据预览
+            </h3>
+            <span class="row-info">
+              {{ excelStore.currentRowIndex + 1 }} / {{ excelStore.totalRows }}
+            </span>
+          </div>
+
+          <div class="row-nav">
+            <button
+              class="btn btn-default btn-sm"
+              :disabled="excelStore.currentRowIndex === 0"
+              @click="prevRow"
+            >
+              上一行
+            </button>
+            <button
+              class="btn btn-default btn-sm"
+              :disabled="excelStore.currentRowIndex >= excelStore.totalRows - 1"
+              @click="nextRow"
+            >
+              下一行
+            </button>
+          </div>
+
+          <div class="data-table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th class="col-index">
+                    #
+                  </th>
+                  <th
+                    v-for="col in excelStore.columns"
+                    :key="col"
+                  >
+                    {{ col }}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="(row, index) in excelStore.rows.slice(0, 100)"
+                  :key="index"
+                  :class="{ active: index === excelStore.currentRowIndex }"
+                  @click="excelStore.setCurrentRow(index)"
+                >
+                  <td class="col-index">
+                    {{ index + 1 }}
+                  </td>
+                  <td
+                    v-for="col in excelStore.columns"
+                    :key="col"
+                    :title="row[col]"
+                  >
+                    {{ row[col] }}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p
+            v-if="excelStore.totalRows > 100"
+            class="table-hint"
+          >
+            仅显示前 100 行，共 {{ excelStore.totalRows }} 行
+          </p>
+        </div>
       </div>
-      <p
-        v-if="excelStore.totalRows > 100"
-        class="table-hint"
-      >
-        仅显示前 100 行，共 {{ excelStore.totalRows }} 行
-      </p>
+
+      <!-- 照片标签页 -->
+      <div v-show="activeTab === 'photos'">
+        <PhotoLibrary />
+      </div>
     </div>
   </aside>
 </template>
@@ -225,8 +258,45 @@ function nextRow(): void {
   height: 100%;
   background-color: var(--color-surface);
   border-right: 1px solid var(--color-border);
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
   flex-shrink: 0;
+  overflow: hidden;
+}
+
+.tab-header {
+  display: flex;
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 12px 0;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  border-bottom: 2px solid transparent;
+  transition: all 0.15s ease;
+  background: none;
+  border-top: none;
+  border-left: none;
+  border-right: none;
+  cursor: pointer;
+}
+
+.tab-btn:hover {
+  color: var(--color-text);
+}
+
+.tab-btn.active {
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
+  font-weight: 500;
+}
+
+.tab-content {
+  flex: 1;
+  overflow-y: auto;
 }
 
 .drop-zone {

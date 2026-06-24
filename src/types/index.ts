@@ -37,8 +37,8 @@ export interface BaseElement {
   type: ElementType;
   x: number;
   y: number;
-  width: number;
-  height: number;
+  width: number | string;
+  height: number | string;
   rotation: number;
   zIndex: number;
   opacity: number;
