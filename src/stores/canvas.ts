@@ -2,6 +2,7 @@ import { defineStore } from "pinia";
 import { computed, ref } from "vue";
 import type {
   CanvasElement,
+  DraftConfig,
   ImageElement,
   PaperConfig,
   TextElement,
@@ -12,6 +13,7 @@ import {
   createTextElement,
   sortByZIndex,
 } from "@/utils/element";
+import type { TemplateConfig } from "@/data/templates";
 
 // 画布 Store：管理元素、稿纸配置、缩放与选中状态
 export const useCanvasStore = defineStore("canvas", () => {
@@ -21,6 +23,7 @@ export const useCanvasStore = defineStore("canvas", () => {
   const zoom = ref(1);
   const minZoom = 0.2;
   const maxZoom = 4;
+  const draft = ref<DraftConfig | null>(null);
 
   const selectedElement = computed<CanvasElement | null>(() => {
     if (!selectedId.value) return null;
@@ -137,6 +140,32 @@ export const useCanvasStore = defineStore("canvas", () => {
     paper.value = { ...paper.value, ...patch };
   }
 
+  // 设置底稿
+  function setDraft(config: DraftConfig | null): void {
+    draft.value = config;
+  }
+
+  // 清除底稿
+  function clearDraft(): void {
+    draft.value = null;
+  }
+
+  // 加载模板
+  function loadTemplate(template: TemplateConfig): void {
+    // 清空现有元素
+    elements.value = [];
+    selectedId.value = null;
+
+    // 设置稿纸配置
+    paper.value = { ...template.paper };
+
+    // 设置底稿
+    draft.value = template.draft ? { ...template.draft } : null;
+
+    // 添加模板元素（深拷贝）
+    elements.value = template.elements.map((el) => ({ ...el }));
+  }
+
   return {
     elements,
     selectedId,
@@ -144,6 +173,7 @@ export const useCanvasStore = defineStore("canvas", () => {
     zoom,
     minZoom,
     maxZoom,
+    draft,
     selectedElement,
     sortedElements,
     maxZIndex,
@@ -161,5 +191,8 @@ export const useCanvasStore = defineStore("canvas", () => {
     zoomOut,
     resetZoom,
     updatePaper,
+    setDraft,
+    clearDraft,
+    loadTemplate,
   };
 });
