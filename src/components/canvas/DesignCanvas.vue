@@ -1,17 +1,51 @@
 <script setup lang="ts">
-import { computed, ref, type CSSProperties } from 'vue'
+import { computed, ref, onMounted, onUnmounted, type CSSProperties } from 'vue'
 import { useCanvasStore } from '@/stores/canvas'
+import { useExcelStore } from '@/stores/excel'
 import { unitToPx } from '@/utils/element'
 import CanvasElementVue from './CanvasElement.vue'
+import PreviewModal from '@/components/panels/PreviewModal.vue'
 
 const canvasStore = useCanvasStore()
+const excelStore = useExcelStore()
 const canvasViewport = ref<HTMLElement | null>(null)
+const showPreview = ref(false)
 
 // 稿纸像素尺寸
 const paperSize = computed(() => ({
   width: unitToPx(canvasStore.paper.width, canvasStore.paper.unit),
   height: unitToPx(canvasStore.paper.height, canvasStore.paper.unit),
 }))
+
+// 计算适合视口的缩放比例
+function fitToViewport(): void {
+  if (!canvasViewport.value) return
+  const viewportWidth = canvasViewport.value.clientWidth - 80 // 减去 padding
+  const viewportHeight = canvasViewport.value.clientHeight - 80
+  const { width, height } = paperSize.value
+  const scaleX = viewportWidth / width
+  const scaleY = viewportHeight / height
+  const scale = Math.min(scaleX, scaleY, 1) // 最大不超过 100%
+  canvasStore.setZoom(scale)
+}
+
+// ResizeObserver 监听视口大小变化
+let resizeObserver: ResizeObserver | null = null
+
+onMounted(() => {
+  if (canvasViewport.value) {
+    resizeObserver = new ResizeObserver(() => {
+      fitToViewport()
+    })
+    resizeObserver.observe(canvasViewport.value)
+    // 初始化时自动适应
+    fitToViewport()
+  }
+})
+
+onUnmounted(() => {
+  resizeObserver?.disconnect()
+})
 
 // 稿纸样式
 const paperStyle = computed<CSSProperties>(() => ({
@@ -67,6 +101,13 @@ const zoomPercent = computed(() => Math.round(canvasStore.zoom * 100))
     <!-- 工具栏 -->
     <div class="canvas-toolbar">
       <div class="toolbar-left">
+        <button
+          class="btn btn-primary btn-sm"
+          :disabled="!excelStore.hasData"
+          @click="showPreview = true"
+        >
+          预览
+        </button>
         <span class="paper-size-label">
           {{ canvasStore.paper.width }} × {{ canvasStore.paper.height }}
           {{ canvasStore.paper.unit }}
@@ -139,6 +180,11 @@ const zoomPercent = computed(() => Math.round(canvasStore.zoom * 100))
         点击元素选中并拖拽 · Ctrl/Cmd + 滚轮缩放
       </span>
     </div>
+
+    <!-- 预览弹窗 -->
+    <PreviewModal
+      v-model:visible="showPreview"
+    />
   </div>
 </template>
 
@@ -166,6 +212,12 @@ const zoomPercent = computed(() => Math.round(canvasStore.zoom * 100))
   font-size: 12px;
   color: var(--color-text-secondary);
   font-family: var(--font-mono);
+}
+
+.toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .toolbar-right {

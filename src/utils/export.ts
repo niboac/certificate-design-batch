@@ -81,6 +81,7 @@ function buildOffscreenNode(
   paper: PaperConfig,
   scale: number,
   draft: DraftConfig | null,
+  resolvePhotoUrl?: (pathTemplate: string, row: Record<string, string>) => string,
 ): HTMLElement {
   const widthPx = unitToPx(paper.width, paper.unit);
   const heightPx = unitToPx(paper.height, paper.unit);
@@ -124,13 +125,21 @@ function buildOffscreenNode(
 
     if (el.type === "text") {
       node.textContent = renderElementContent(el, row);
-    } else if (el.type === "image" && el.src) {
-      const img = document.createElement("img");
-      img.src = el.src;
-      img.style.width = "100%";
-      img.style.height = "100%";
-      img.style.objectFit = el.fit;
-      node.appendChild(img);
+    } else if (el.type === "image") {
+      let imgSrc = "";
+      if (el.srcType === "static") {
+        imgSrc = el.src;
+      } else if (el.srcType === "dynamic" && resolvePhotoUrl) {
+        imgSrc = resolvePhotoUrl(el.pathTemplate, row);
+      }
+      if (imgSrc) {
+        const img = document.createElement("img");
+        img.src = imgSrc;
+        img.style.width = "100%";
+        img.style.height = "100%";
+        img.style.objectFit = el.fit;
+        node.appendChild(img);
+      }
     }
 
     container.appendChild(node);
@@ -191,11 +200,12 @@ export async function batchExport(
     quality: number;
     fileName: string;
     draft: DraftConfig | null;
+    resolvePhotoUrl?: (pathTemplate: string, row: Record<string, string>) => string;
     onStart?: (total: number) => void;
     onProgress?: (current: number, total: number) => void;
   },
 ): Promise<void> {
-  const { format, quality, fileName, draft, onStart, onProgress } = options;
+  const { format, quality, fileName, draft, resolvePhotoUrl, onStart, onProgress } = options;
   const total = rows.length;
   onStart?.(total);
 
@@ -211,7 +221,7 @@ export async function batchExport(
     });
 
     for (let i = 0; i < total; i++) {
-      const node = buildOffscreenNode(elements, rows[i], paper, scale, draft);
+      const node = buildOffscreenNode(elements, rows[i], paper, scale, draft, resolvePhotoUrl);
       try {
         // PDF 内部使用 JPEG 格式，体积远小于 PNG，避免字符串超长
         const dataUrl = await exportNodeToImage(node, "jpg", quality);
@@ -240,7 +250,7 @@ export async function batchExport(
 
   // 图片格式：每行导出一张，逐张下载
   for (let i = 0; i < total; i++) {
-    const node = buildOffscreenNode(elements, rows[i], paper, scale, draft);
+    const node = buildOffscreenNode(elements, rows[i], paper, scale, draft, resolvePhotoUrl);
     try {
       const blob = await exportNodeToBlob(node, format, quality);
       saveAs(blob, `${fileName}_${i + 1}.${format}`);

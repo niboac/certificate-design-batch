@@ -1,6 +1,9 @@
 // 元素类型枚举
 export type ElementType = 'text' | 'image'
 
+// 图片源类型
+export type ImageSourceType = 'static' | 'dynamic'
+
 // 文本对齐方式
 export type TextAlign = 'left' | 'center' | 'right'
 
@@ -59,7 +62,9 @@ export interface TextElement extends BaseElement {
 // 图片元素
 export interface ImageElement extends BaseElement {
   type: 'image'
-  src: string
+  srcType: ImageSourceType // static: 静态图片（上传的固定图片），dynamic: 动态图片（根据路径模板生成）
+  src: string // 静态图片的 base64 URL，或动态图片的预览路径
+  pathTemplate: string // 动态图片路径模板，支持 {{列名}} 变量
   fit: ImageFit
   backgroundColor: string
   borderRadius: number
@@ -110,4 +115,11 @@ export interface FontInfo {
   name: string
   label: string
   category: string
+}
+
+// 照片项（本地临时存储）
+export interface PhotoItem {
+  name: string // 文件名
+  path: string // 相对路径（文件夹名/文件名）
+  url: string // object URL，用于浏览器预览
 }

@@ -51,6 +51,7 @@ export function createImageElement(
   const base: ImageElement = {
     id: generateId(),
     type: "image",
+    srcType: "static",
     x: 100,
     y: 100,
     width: 160,
@@ -61,6 +62,7 @@ export function createImageElement(
     visible: true,
     locked: false,
     src: "",
+    pathTemplate: "",
     fit: "cover",
     backgroundColor: "transparent",
     borderRadius: 0,

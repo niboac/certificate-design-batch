@@ -2,6 +2,7 @@
 import { computed, ref, type CSSProperties } from "vue";
 import { useCanvasStore } from "@/stores/canvas";
 import { useExcelStore } from "@/stores/excel";
+import { usePhotosStore } from "@/stores/photos";
 import type { CanvasElement } from "@/types";
 import { interpolateContent } from "@/utils/element";
 
@@ -11,6 +12,7 @@ const props = defineProps<{
 
 const canvasStore = useCanvasStore();
 const excelStore = useExcelStore();
+const photosStore = usePhotosStore();
 
 const isSelected = computed(() => canvasStore.selectedId === props.element.id);
 
@@ -19,6 +21,14 @@ const displayContent = computed(() => {
   if (props.element.type !== "text") return "";
   const row = excelStore.currentRow ?? {};
   return interpolateContent(props.element.content, row);
+});
+
+// 动态图片的实际显示 URL
+const dynamicImageSrc = computed(() => {
+  if (props.element.type !== "image") return "";
+  if (props.element.srcType === "static") return props.element.src;
+  const row = excelStore.currentRow ?? {};
+  return photosStore.resolvePhotoUrl(props.element.pathTemplate, row);
 });
 
 // 元素样式
@@ -271,8 +281,8 @@ function handleResizeMove(event: MouseEvent, handle: ResizeHandle): void {
     <!-- 图片元素内容 -->
     <template v-else-if="element.type === 'image'">
       <img
-        v-if="element.src"
-        :src="element.src"
+        v-if="dynamicImageSrc"
+        :src="dynamicImageSrc"
         class="element-image"
         :style="{ objectFit: element.fit }"
         draggable="false"
@@ -280,8 +290,25 @@ function handleResizeMove(event: MouseEvent, handle: ResizeHandle): void {
       <div
         v-else
         class="image-placeholder"
+        :class="{ 'dynamic-placeholder': element.srcType === 'dynamic' }"
       >
-        <span>图片占位</span>
+        <template v-if="element.srcType === 'dynamic'">
+          <div class="placeholder-icon">
+            ⚙
+          </div>
+          <div class="placeholder-text">
+            动态图片
+          </div>
+          <div
+            v-if="element.pathTemplate"
+            class="placeholder-path"
+          >
+            {{ element.pathTemplate }}
+          </div>
+        </template>
+        <template v-else>
+          <span>图片占位</span>
+        </template>
       </div>
     </template>
 
@@ -350,6 +377,36 @@ function handleResizeMove(event: MouseEvent, handle: ResizeHandle): void {
   background-color: #f3f4f6;
   color: var(--color-text-tertiary);
   font-size: 12px;
+}
+
+.image-placeholder.dynamic-placeholder {
+  flex-direction: column;
+  gap: 4px;
+  background-color: #eff6ff;
+  border: 2px dashed #93c5fd;
+  color: #3b82f6;
+  padding: 8px;
+  text-align: center;
+}
+
+.placeholder-icon {
+  font-size: 18px;
+}
+
+.placeholder-text {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.placeholder-path {
+  font-size: 10px;
+  font-family: var(--font-mono, monospace);
+  color: #6b7280;
+  word-break: break-all;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .resize-handle {

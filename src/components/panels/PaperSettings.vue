@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useCanvasStore } from '@/stores/canvas'
 import { PAPER_PRESETS } from '@/utils/fonts'
-import type { PaperOrientation, PaperUnit } from '@/types'
+import type { PaperUnit } from '@/types'
 
 const canvasStore = useCanvasStore()
 
@@ -30,7 +30,18 @@ function handleDraftUpload(event: Event): void {
   const reader = new FileReader()
   reader.onload = (e) => {
     const src = e.target?.result as string
-    canvasStore.setDraft(src, canvasStore.draft?.opacity ?? 1)
+    // 加载图片获取尺寸
+    const img = new Image()
+    img.onload = () => {
+      // 自动设置稿纸尺寸为底稿尺寸（像素）
+      canvasStore.updatePaper({
+        width: img.width,
+        height: img.height,
+        unit: 'px',
+      })
+      canvasStore.setDraft(src, canvasStore.draft?.opacity ?? 1)
+    }
+    img.src = src
   }
   reader.readAsDataURL(file)
   input.value = ''

@@ -60,6 +60,27 @@ export const useCanvasStore = defineStore("canvas", () => {
     return el;
   }
 
+  // 添加静态图片元素
+  function addStaticImage(src: string): ImageElement {
+    return addImageElement({
+      srcType: "static",
+      src,
+      x: 80,
+      y: 80,
+    });
+  }
+
+  // 添加动态图片元素
+  function addDynamicImage(pathTemplate = ""): ImageElement {
+    return addImageElement({
+      srcType: "dynamic",
+      src: "",
+      pathTemplate,
+      x: 80,
+      y: 80,
+    });
+  }
+
   // 更新元素属性
   function updateElement(id: string, patch: Partial<CanvasElement>): void {
     const index = elements.value.findIndex((el) => el.id === id);
@@ -169,6 +190,8 @@ export const useCanvasStore = defineStore("canvas", () => {
     maxZIndex,
     addTextElement,
     addImageElement,
+    addStaticImage,
+    addDynamicImage,
     updateElement,
     removeElement,
     selectElement,

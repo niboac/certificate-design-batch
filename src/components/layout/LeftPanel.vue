@@ -2,10 +2,13 @@
 import { ref } from "vue";
 import { useExcelStore } from "@/stores/excel";
 import { useCanvasStore } from "@/stores/canvas";
+import PhotoLibrary from "@/components/panels/PhotoLibrary.vue";
+import PreviewModal from "@/components/panels/PreviewModal.vue";
 
 const excelStore = useExcelStore();
 const canvasStore = useCanvasStore();
 const fileInput = ref<HTMLInputElement | null>(null);
+const showPreview = ref(false);
 const dragOver = ref(false);
 
 // 触发文件选择
@@ -171,6 +174,12 @@ function nextRow(): void {
         >
           下一行
         </button>
+        <button
+          class="btn btn-primary btn-sm"
+          @click="showPreview = true"
+        >
+          预览效果
+        </button>
       </div>
 
       <div class="data-table-wrapper">
@@ -216,6 +225,14 @@ function nextRow(): void {
         仅显示前 100 行，共 {{ excelStore.totalRows }} 行
       </p>
     </div>
+
+    <!-- 照片库 -->
+    <PhotoLibrary />
+
+    <!-- 效果预览弹窗 -->
+    <PreviewModal
+      v-model:visible="showPreview"
+    />
   </aside>
 </template>
 
