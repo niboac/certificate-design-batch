@@ -19,6 +19,14 @@ const FALLBACK_FONTS: FontInfo[] = [
 // 字体分类
 type FontCategory = 'sans-serif' | 'serif' | 'monospace' | 'cursive' | 'fantasy' | 'other'
 
+// 自定义字体项
+export interface CustomFont {
+  name: string // 字体名称（用于 font-family）
+  label: string // 显示名称
+  family: string // FontFace 家族名
+  url: string // 字体文件 URL
+}
+
 // 判断字体类别
 function categorizeFont(family: string): FontCategory {
   const lower = family.toLowerCase()
@@ -53,6 +61,24 @@ export const useFontsStore = defineStore('fonts', () => {
   const error = ref<string>('')
   const permissionGranted = ref(false)
   const apiSupported = ref(false)
+
+  // 自定义字体列表
+  const customFonts = ref<CustomFont[]>([])
+
+  // 所有字体（系统字体 + 自定义字体）
+  const allFonts = computed(() => {
+    const systemFonts = fonts.value.map((f) => ({
+      ...f,
+      isCustom: false as const,
+    }))
+    const userFonts = customFonts.value.map((f) => ({
+      name: f.name,
+      label: f.label,
+      category: 'other',
+      isCustom: true as const,
+    }))
+    return [...userFonts, ...systemFonts]
+  })
 
   // 是否使用系统字体（而非回退列表）
   const usingSystemFonts = computed(() => fonts.value.length > 0 && permissionGranted.value)
@@ -124,6 +150,41 @@ export const useFontsStore = defineStore('fonts', () => {
     }
   }
 
+  // 添加自定义字体
+  async function addCustomFont(file: File): Promise<void> {
+    const fontName = file.name.replace(/\.(ttf|otf|woff|woff2)$/i, '')
+    const fontFamily = `custom_${Date.now()}_${fontName}`
+    const url = URL.createObjectURL(file)
+
+    try {
+      // 加载字体
+      const fontFace = new FontFace(fontFamily, `url(${url})`)
+      await fontFace.load()
+      document.fonts.add(fontFace)
+
+      const customFont: CustomFont = {
+        name: fontFamily,
+        label: fontName,
+        family: fontFamily,
+        url,
+      }
+      customFonts.value.push(customFont)
+    } catch (err) {
+      URL.revokeObjectURL(url)
+      throw new Error(`字体加载失败: ${file.name}`)
+    }
+  }
+
+  // 移除自定义字体
+  function removeCustomFont(fontName: string): void {
+    const index = customFonts.value.findIndex((f) => f.name === fontName)
+    if (index !== -1) {
+      const font = customFonts.value[index]
+      URL.revokeObjectURL(font.url)
+      customFonts.value.splice(index, 1)
+    }
+  }
+
   // 初始化字体列表
   async function init(): Promise<void> {
     await loadSystemFonts()
@@ -142,7 +203,11 @@ export const useFontsStore = defineStore('fonts', () => {
     permissionGranted,
     apiSupported,
     usingSystemFonts,
+    customFonts,
+    allFonts,
     init,
     getFontLabel,
+    addCustomFont,
+    removeCustomFont,
   }
 })

@@ -116,6 +116,40 @@ function insertPhotoPath(photoPath: string): void {
     pathTemplate: photoPath,
   })
 }
+
+// 自定义字体上传相关
+const customFontInput = ref<HTMLInputElement | null>(null)
+const fontUploadError = ref('')
+
+function triggerUploadFont(): void {
+  customFontInput.value?.click()
+}
+
+async function handleUploadFont(event: Event): Promise<void> {
+  const target = event.target as HTMLInputElement
+  const file = target.files?.[0]
+  if (!file) return
+
+  fontUploadError.value = ''
+  const validExtensions = ['.ttf', '.otf', '.woff', '.woff2']
+  const ext = file.name.toLowerCase().slice(file.name.lastIndexOf('.'))
+  if (!validExtensions.includes(ext)) {
+    fontUploadError.value = '仅支持 ttf, otf, woff, woff2 格式'
+    target.value = ''
+    return
+  }
+
+  try {
+    await fontsStore.addCustomFont(file)
+  } catch (err) {
+    fontUploadError.value = err instanceof Error ? err.message : '字体加载失败'
+  }
+  target.value = ''
+}
+
+function handleRemoveCustomFont(fontName: string): void {
+  fontsStore.removeCustomFont(fontName)
+}
 </script>
 
 <template>
@@ -218,27 +252,74 @@ function insertPhotoPath(photoPath: string): void {
           <h3 class="panel-title">
             字体设置
           </h3>
+
+          <!-- 自定义字体上传 -->
+          <div
+            v-if="fontsStore.customFonts.length > 0"
+            class="custom-fonts-section"
+          >
+            <label class="form-label">已上传字体</label>
+            <div class="custom-font-list">
+              <div
+                v-for="font in fontsStore.customFonts"
+                :key="font.name"
+                class="custom-font-item"
+              >
+                <span :style="{ fontFamily: font.name }">{{ font.label }}</span>
+                <button
+                  class="btn-remove"
+                  title="移除"
+                  @click="handleRemoveCustomFont(font.name)"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+          </div>
+
           <div class="form-item">
-            <label class="form-label">
-              字体
-              <span
-                v-if="fontsStore.loading"
-                class="loading-hint"
-              >(加载中...)</span>
-              <span
-                v-else-if="!fontsStore.apiSupported"
-                class="api-hint"
-              >(预设列表)</span>
-              <span
-                v-else-if="fontsStore.permissionGranted"
-                class="api-hint success"
-              >(系统字体)</span>
-            </label>
+            <div class="form-label-row">
+              <label class="form-label">字体</label>
+              <button
+                class="btn-upload-font"
+                @click="triggerUploadFont"
+              >
+                上传字体
+              </button>
+              <input
+                ref="customFontInput"
+                type="file"
+                accept=".ttf,.otf,.woff,.woff2"
+                hidden
+                @change="handleUploadFont"
+              >
+            </div>
+            <p
+              v-if="fontUploadError"
+              class="form-error"
+            >
+              {{ fontUploadError }}
+            </p>
             <select
               class="form-select font-select"
               :value="element.fontFamily"
               @change="updateText({ fontFamily: ($event.target as HTMLSelectElement).value })"
             >
+              <!-- 自定义字体分组 -->
+              <optgroup
+                v-if="fontsStore.customFonts.length > 0"
+                label="自定义字体"
+              >
+                <option
+                  v-for="font in fontsStore.customFonts"
+                  :key="font.name"
+                  :value="font.name"
+                  :style="{ fontFamily: font.name }"
+                >
+                  {{ font.label }}
+                </option>
+              </optgroup>
+              <!-- 系统字体分组 -->
               <optgroup
                 v-for="group in ['serif', 'sans-serif', 'monospace', 'cursive', 'other']"
                 :key="group"
@@ -972,5 +1053,79 @@ function insertPhotoPath(photoPath: string): void {
   font-size: 11px;
   color: var(--color-text-tertiary);
   text-align: center;
+}
+
+.form-label-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-upload-font {
+  padding: 2px 8px;
+  font-size: 11px;
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-sm);
+  background-color: var(--color-primary-light);
+  color: var(--color-primary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-upload-font:hover {
+  background-color: var(--color-primary);
+  color: #fff;
+}
+
+.form-error {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--color-danger);
+}
+
+.custom-fonts-section {
+  margin-bottom: 12px;
+  padding: 8px 10px;
+  background-color: #f9fafb;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+}
+
+.custom-font-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.custom-font-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background-color: #fff;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+}
+
+.btn-remove {
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background-color: #fee2e2;
+  color: #dc2626;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.btn-remove:hover {
+  background-color: #fecaca;
 }
 </style>

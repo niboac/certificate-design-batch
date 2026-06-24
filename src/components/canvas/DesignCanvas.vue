@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, onMounted, onUnmounted, type CSSProperties } from 'vue'
+import { computed, ref, onMounted, onUnmounted, nextTick, type CSSProperties } from 'vue'
 import { useCanvasStore } from '@/stores/canvas'
 import { useExcelStore } from '@/stores/excel'
 import { unitToPx } from '@/utils/element'
@@ -27,6 +27,12 @@ function fitToViewport(): void {
   const scaleY = viewportHeight / height
   const scale = Math.min(scaleX, scaleY, 1) // 最大不超过 100%
   canvasStore.setZoom(scale)
+  // 缩放后滚动到画布中心
+  nextTick(() => {
+    if (!canvasViewport.value) return
+    canvasViewport.value.scrollLeft = (canvasViewport.value.scrollWidth - canvasViewport.value.clientWidth) / 2
+    canvasViewport.value.scrollTop = (canvasViewport.value.scrollHeight - canvasViewport.value.clientHeight) / 2
+  })
 }
 
 // ResizeObserver 监听视口大小变化
@@ -53,10 +59,18 @@ const paperStyle = computed<CSSProperties>(() => ({
   height: `${paperSize.value.height}px`,
   backgroundColor: canvasStore.paper.backgroundColor,
   transform: `scale(${canvasStore.zoom})`,
-  transformOrigin: 'center center',
+  transformOrigin: 'top left',
   position: 'relative',
   boxShadow: '0 4px 24px rgb(0 0 0 / 12%)',
   flexShrink: 0,
+}))
+
+// 稿纸外层容器样式：用于撑开滚动区域，匹配缩放后的画布实际尺寸
+const paperWrapperStyle = computed<CSSProperties>(() => ({
+  width: `${paperSize.value.width * canvasStore.zoom}px`,
+  height: `${paperSize.value.height * canvasStore.zoom}px`,
+  flexShrink: 0,
+  position: 'relative',
 }))
 
 // 网格背景样式
@@ -144,25 +158,30 @@ const zoomPercent = computed(() => Math.round(canvasStore.zoom * 100))
       @wheel="handleWheel"
     >
       <div
-        class="paper"
-        :style="paperStyle"
+        class="paper-wrapper"
+        :style="paperWrapperStyle"
       >
         <div
-          class="grid-layer"
-          :style="gridStyle"
-        />
-        <img
-          v-if="canvasStore.draft"
-          class="draft-layer"
-          :src="canvasStore.draft.src"
-          :style="{ opacity: canvasStore.draft.opacity }"
-          alt="底稿"
+          class="paper"
+          :style="paperStyle"
         >
-        <CanvasElementVue
-          v-for="el in canvasStore.sortedElements"
-          :key="el.id"
-          :element="el"
-        />
+          <div
+            class="grid-layer"
+            :style="gridStyle"
+          />
+          <img
+            v-if="canvasStore.draft"
+            class="draft-layer"
+            :src="canvasStore.draft.src"
+            :style="{ opacity: canvasStore.draft.opacity }"
+            alt="底稿"
+          >
+          <CanvasElementVue
+            v-for="el in canvasStore.sortedElements"
+            :key="el.id"
+            :element="el"
+          />
+        </div>
       </div>
     </div>
 
@@ -238,13 +257,19 @@ const zoomPercent = computed(() => Math.round(canvasStore.zoom * 100))
   flex: 1;
   overflow: auto;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   padding: 40px;
 }
 
+.paper-wrapper {
+  /* 容器尺寸由 JS 控制以匹配缩放后的画布大小 */
+}
+
 .paper {
-  position: relative;
+  position: absolute;
+  top: 0;
+  left: 0;
   overflow: hidden;
 }
 

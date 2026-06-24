@@ -7,6 +7,7 @@ import type {
   PaperConfig,
   TextElement,
 } from "@/types";
+import type { TemplateConfig } from "@/data/templates";
 import {
   createDefaultPaper,
   createImageElement,
@@ -177,6 +178,19 @@ export const useCanvasStore = defineStore("canvas", () => {
     }
   }
 
+  // 加载模板
+  function loadTemplate(template: TemplateConfig): void {
+    paper.value = { ...template.paper };
+    elements.value = template.elements.map((el) => ({ ...el }));
+    if (template.draft) {
+      draft.value = { ...template.draft };
+    } else {
+      draft.value = null;
+    }
+    selectedId.value = null;
+    zoom.value = 1;
+  }
+
   return {
     elements,
     selectedId,
@@ -207,5 +221,6 @@ export const useCanvasStore = defineStore("canvas", () => {
     setDraft,
     clearDraft,
     updateDraftOpacity,
+    loadTemplate,
   };
 });
