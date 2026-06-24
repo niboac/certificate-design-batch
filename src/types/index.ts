@@ -25,14 +25,17 @@ export type FontWeight = 'normal' | 'bold' | '300' | '400' | '500' | '600' | '70
 // 字体风格
 export type FontStyle = 'normal' | 'italic'
 
+// 元素尺寸类型（支持数字像素值或 'auto'、'100%' 等 CSS 字符串）
+export type SizeValue = number | string
+
 // 元素基础属性
 export interface BaseElement {
   id: string
   type: ElementType
   x: number
   y: number
-  width: number
-  height: number
+  width: SizeValue
+  height: SizeValue
   rotation: number
   zIndex: number
   opacity: number

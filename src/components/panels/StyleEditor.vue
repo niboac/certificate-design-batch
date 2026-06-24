@@ -26,6 +26,22 @@ function update(patch: Partial<CanvasElement>): void {
   canvasStore.updateElement(element.value.id, patch)
 }
 
+// 更新元素尺寸，支持数字和 'auto'、'100%' 字符串
+function updateSize(
+  key: 'width' | 'height',
+  value: string,
+): void {
+  if (!element.value) return
+  if (value === 'auto' || value === '100%') {
+    canvasStore.updateElement(element.value.id, { [key]: value })
+    return
+  }
+  const num = Number(value)
+  if (!Number.isNaN(num)) {
+    canvasStore.updateElement(element.value.id, { [key]: num })
+  }
+}
+
 // 更新文本属性
 function updateText(patch: Partial<Extract<CanvasElement, { type: 'text' }>>): void {
   if (!element.value || element.value.type !== 'text') return
@@ -189,20 +205,24 @@ function handleRemoveCustomFont(fontName: string): void {
           <div class="form-item">
             <label class="form-label">宽度</label>
             <input
-              type="number"
               class="form-input"
               :value="element.width"
-              @input="update({ width: Number(($event.target as HTMLInputElement).value) })"
+              @input="updateSize('width', ($event.target as HTMLInputElement).value)"
             >
+            <p class="form-hint">
+              支持数字、auto、100%
+            </p>
           </div>
           <div class="form-item">
             <label class="form-label">高度</label>
             <input
-              type="number"
               class="form-input"
               :value="element.height"
-              @input="update({ height: Number(($event.target as HTMLInputElement).value) })"
+              @input="updateSize('height', ($event.target as HTMLInputElement).value)"
             >
+            <p class="form-hint">
+              支持数字、auto、100%
+            </p>
           </div>
           <div class="form-item">
             <label class="form-label">旋转</label>

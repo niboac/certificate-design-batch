@@ -38,8 +38,8 @@ const elementStyle = computed<CSSProperties>(() => {
     position: "absolute",
     left: `${el.x}px`,
     top: `${el.y}px`,
-    width: `${el.width}px`,
-    height: `${el.height}px`,
+    width: typeof el.width === "number" ? `${el.width}px` : el.width,
+    height: typeof el.height === "number" ? `${el.height}px` : el.height,
     transform: `rotate(${el.rotation}deg)`,
     opacity: el.opacity,
     zIndex: el.zIndex,
@@ -212,6 +212,10 @@ function handleResizeStart(event: MouseEvent, handle: ResizeHandle): void {
 }
 
 function handleResizeMove(event: MouseEvent, handle: ResizeHandle): void {
+  // 当 width/height 是字符串（如 'auto'、'100%'）时，禁止缩放
+  if (typeof props.element.width === "string" || typeof props.element.height === "string") {
+    return;
+  }
   const dx = (event.clientX - resizeStart.x) / canvasStore.zoom;
   const dy = (event.clientY - resizeStart.y) / canvasStore.zoom;
   const { elX, elY, elW, elH } = resizeStart;
