@@ -110,6 +110,13 @@ const zoomPercent = computed(() => Math.round(canvasStore.zoom * 100))
           class="grid-layer"
           :style="gridStyle"
         />
+        <img
+          v-if="canvasStore.draft"
+          class="draft-layer"
+          :src="canvasStore.draft.src"
+          :style="{ opacity: canvasStore.draft.opacity }"
+          alt="底稿"
+        >
         <CanvasElementVue
           v-for="el in canvasStore.sortedElements"
           :key="el.id"
@@ -191,6 +198,16 @@ const zoomPercent = computed(() => Math.round(canvasStore.zoom * 100))
 
 .grid-layer {
   z-index: 0;
+}
+
+.draft-layer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
 }
 
 .canvas-statusbar {

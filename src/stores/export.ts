@@ -16,6 +16,7 @@ export const useExportStore = defineStore('export', () => {
   const progress = ref(0)
   const total = ref(0)
   const error = ref<string>('')
+  const exportWithDraft = ref(false)
 
   // 执行批量导出
   async function runExport(): Promise<void> {
@@ -51,6 +52,7 @@ export const useExportStore = defineStore('export', () => {
           format: format.value,
           quality: quality.value,
           fileName: fileName.value || '批量导出',
+          draft: exportWithDraft.value ? canvasStore.draft : null,
           onProgress: (current) => {
             progress.value = current
           },
@@ -74,6 +76,7 @@ export const useExportStore = defineStore('export', () => {
     progress,
     total,
     error,
+    exportWithDraft,
     runExport,
   }
 })

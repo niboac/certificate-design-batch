@@ -140,6 +140,18 @@ watch(
           <span class="range-value">{{ Math.round(exportStore.quality * 100) }}%</span>
         </div>
       </div>
+      <div
+        v-if="canvasStore.draft"
+        class="form-item"
+      >
+        <label class="form-label">
+          <input
+            v-model="exportStore.exportWithDraft"
+            type="checkbox"
+          >
+          导出底稿
+        </label>
+      </div>
     </div>
 
     <!-- 导出按钮 -->

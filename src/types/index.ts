@@ -81,6 +81,12 @@ export interface PaperConfig {
   gridSize: number
 }
 
+// 底稿配置
+export interface DraftConfig {
+  src: string // 底稿图片 URL（Base64 或普通 URL）
+  opacity: number
+}
+
 // Excel 数据结构
 export interface ExcelData {
   columns: string[]
@@ -96,6 +102,7 @@ export interface ExportConfig {
   startRow: number
   endRow: number
   onePagePerRow: boolean
+  exportWithDraft: boolean
 }
 
 // 字体信息

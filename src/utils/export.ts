@@ -1,7 +1,7 @@
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import { saveAs } from "file-saver";
-import type { CanvasElement, ExportFormat, PaperConfig } from "@/types";
+import type { CanvasElement, DraftConfig, ExportFormat, PaperConfig } from "@/types";
 import { interpolateContent, unitToPx } from "@/utils/element";
 
 // 渲染单个元素为内联样式对象（用于离屏渲染）
@@ -80,6 +80,7 @@ function buildOffscreenNode(
   row: Record<string, string>,
   paper: PaperConfig,
   scale: number,
+  draft: DraftConfig | null,
 ): HTMLElement {
   const widthPx = unitToPx(paper.width, paper.unit);
   const heightPx = unitToPx(paper.height, paper.unit);
@@ -94,6 +95,21 @@ function buildOffscreenNode(
   container.style.overflow = "hidden";
   container.style.transformOrigin = "top left";
   container.style.transform = `scale(${scale})`;
+
+  // 添加底稿图片
+  if (draft) {
+    const draftNode = document.createElement("img");
+    draftNode.src = draft.src;
+    draftNode.style.position = "absolute";
+    draftNode.style.left = "0";
+    draftNode.style.top = "0";
+    draftNode.style.width = `${widthPx}px`;
+    draftNode.style.height = `${heightPx}px`;
+    draftNode.style.opacity = String(draft.opacity);
+    draftNode.style.pointerEvents = "none";
+    draftNode.style.zIndex = "0";
+    container.appendChild(draftNode);
+  }
 
   const sorted = [...elements]
     .filter((el) => el.visible)
@@ -132,12 +148,37 @@ async function exportNodeToImage(
 ): Promise<string> {
   const canvas = await html2canvas(node, {
     backgroundColor: null,
-    scale: 2,
+    scale: 1.5,
     useCORS: true,
     logging: false,
   });
   const mime = format === "jpg" ? "image/jpeg" : "image/png";
   return canvas.toDataURL(mime, quality);
+}
+
+// 导出单页为 Blob（避免 base64 字符串转换）
+async function exportNodeToBlob(
+  node: HTMLElement,
+  format: ExportFormat,
+  quality: number,
+): Promise<Blob> {
+  const canvas = await html2canvas(node, {
+    backgroundColor: null,
+    scale: 1.5,
+    useCORS: true,
+    logging: false,
+  });
+  const mime = format === "jpg" ? "image/jpeg" : "image/png";
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => {
+        if (blob) resolve(blob);
+        else reject(new Error("canvas.toBlob 返回空值"));
+      },
+      mime,
+      quality,
+    );
+  });
 }
 
 // 批量导出
@@ -149,52 +190,59 @@ export async function batchExport(
     format: ExportFormat;
     quality: number;
     fileName: string;
+    draft: DraftConfig | null;
     onStart?: (total: number) => void;
     onProgress?: (current: number, total: number) => void;
   },
 ): Promise<void> {
-  const { format, quality, fileName, onStart, onProgress } = options;
+  const { format, quality, fileName, draft, onStart, onProgress } = options;
   const total = rows.length;
   onStart?.(total);
 
-  const scale = 2;
+  // DOM 层面不缩放，由 html2canvas 的 scale 参数控制分辨率
+  const scale = 1;
 
   if (format === "pdf") {
     const pdf = new jsPDF({
       orientation: paper.orientation,
       unit: paper.unit,
       format: [paper.width, paper.height],
+      compress: true,
     });
 
     for (let i = 0; i < total; i++) {
-      const node = buildOffscreenNode(elements, rows[i], paper, scale);
+      const node = buildOffscreenNode(elements, rows[i], paper, scale, draft);
       try {
-        const dataUrl = await exportNodeToImage(node, "png", quality);
+        // PDF 内部使用 JPEG 格式，体积远小于 PNG，避免字符串超长
+        const dataUrl = await exportNodeToImage(node, "jpg", quality);
         if (i > 0) pdf.addPage([paper.width, paper.height], paper.orientation);
-        pdf.addImage(dataUrl, "PNG", 0, 0, paper.width, paper.height);
+        pdf.addImage(
+          dataUrl,
+          "JPEG",
+          0,
+          0,
+          paper.width,
+          paper.height,
+          undefined,
+          "FAST",
+        );
       } finally {
         document.body.removeChild(node);
       }
       onProgress?.(i + 1, total);
     }
 
-    pdf.save(`${fileName}.pdf`);
+    // 使用 output('blob') + saveAs 替代 pdf.save()，避免字符串拼接超限
+    const blob = pdf.output("blob");
+    saveAs(blob, `${fileName}.pdf`);
     return;
   }
 
-  // 图片格式：每行导出一张，打包为 zip 不便，这里逐张下载
+  // 图片格式：每行导出一张，逐张下载
   for (let i = 0; i < total; i++) {
-    const node = buildOffscreenNode(elements, rows[i], paper, scale);
+    const node = buildOffscreenNode(elements, rows[i], paper, scale, draft);
     try {
-      const dataUrl = await exportNodeToImage(node, format, quality);
-      const base64 = dataUrl.split(",")[1];
-      const mime = format === "jpg" ? "image/jpeg" : "image/png";
-      const binary = atob(base64);
-      const bytes = new Uint8Array(binary.length);
-      for (let j = 0; j < binary.length; j++) {
-        bytes[j] = binary.charCodeAt(j);
-      }
-      const blob = new Blob([bytes], { type: mime });
+      const blob = await exportNodeToBlob(node, format, quality);
       saveAs(blob, `${fileName}_${i + 1}.${format}`);
     } finally {
       document.body.removeChild(node);

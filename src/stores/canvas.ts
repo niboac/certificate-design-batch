@@ -2,6 +2,7 @@ import { defineStore } from "pinia";
 import { computed, ref } from "vue";
 import type {
   CanvasElement,
+  DraftConfig,
   ImageElement,
   PaperConfig,
   TextElement,
@@ -21,6 +22,7 @@ export const useCanvasStore = defineStore("canvas", () => {
   const zoom = ref(1);
   const minZoom = 0.2;
   const maxZoom = 4;
+  const draft = ref<DraftConfig | null>(null);
 
   const selectedElement = computed<CanvasElement | null>(() => {
     if (!selectedId.value) return null;
@@ -137,6 +139,23 @@ export const useCanvasStore = defineStore("canvas", () => {
     paper.value = { ...paper.value, ...patch };
   }
 
+  // 设置底稿
+  function setDraft(src: string, opacity = 1): void {
+    draft.value = { src, opacity };
+  }
+
+  // 清除底稿
+  function clearDraft(): void {
+    draft.value = null;
+  }
+
+  // 更新底稿透明度
+  function updateDraftOpacity(opacity: number): void {
+    if (draft.value) {
+      draft.value.opacity = opacity;
+    }
+  }
+
   return {
     elements,
     selectedId,
@@ -144,6 +163,7 @@ export const useCanvasStore = defineStore("canvas", () => {
     zoom,
     minZoom,
     maxZoom,
+    draft,
     selectedElement,
     sortedElements,
     maxZIndex,
@@ -161,5 +181,8 @@ export const useCanvasStore = defineStore("canvas", () => {
     zoomOut,
     resetZoom,
     updatePaper,
+    setDraft,
+    clearDraft,
+    updateDraftOpacity,
   };
 });
