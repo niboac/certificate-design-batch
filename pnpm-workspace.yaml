@@ -2,3 +2,5 @@ allowBuilds:
   core-js: true
   esbuild: true
   vue-demi: true
+minimumReleaseAgeExclude:
+  - vite@8.1.0
