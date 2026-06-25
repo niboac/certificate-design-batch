@@ -4,6 +4,8 @@ import type { ExportFormat } from '@/types'
 import { batchExport } from '@/utils/export'
 import { useCanvasStore } from './canvas'
 import { useExcelStore } from './excel'
+import { usePhotosStore } from './photos'
+import { useFontsStore } from './fonts'
 
 // 导出 Store：管理导出配置与进度
 export const useExportStore = defineStore('export', () => {
@@ -22,6 +24,8 @@ export const useExportStore = defineStore('export', () => {
   async function runExport(): Promise<void> {
     const canvasStore = useCanvasStore()
     const excelStore = useExcelStore()
+    const photosStore = usePhotosStore()
+    const fontsStore = useFontsStore()
 
     if (!excelStore.hasData) {
       error.value = '请先导入 Excel 数据'
@@ -44,6 +48,11 @@ export const useExportStore = defineStore('export', () => {
     total.value = rows.length
 
     try {
+      // 确保自定义字体已加载
+      if (fontsStore.customFonts.length > 0 && document.fonts && document.fonts.ready) {
+        await document.fonts.ready
+      }
+
       await batchExport(
         canvasStore.elements,
         rows,
@@ -53,6 +62,7 @@ export const useExportStore = defineStore('export', () => {
           quality: quality.value,
           fileName: fileName.value || '批量导出',
           draft: includeDraft.value ? canvasStore.draft : null,
+          resolvePhotoUrl: (pathTemplate, row) => photosStore.resolvePhotoUrl(pathTemplate, row),
           onProgress: (current) => {
             progress.value = current
           },

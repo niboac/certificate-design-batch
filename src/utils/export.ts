@@ -1,8 +1,45 @@
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import { saveAs } from "file-saver";
-import type { CanvasElement, DraftConfig, ExportFormat, PaperConfig } from "@/types";
+import type { CanvasElement, CustomFont, DraftConfig, ExportFormat, PaperConfig } from "@/types";
 import { interpolateContent, unitToPx } from "@/utils/element";
+
+// 将尺寸值格式化为 CSS 字符串（支持数字、auto、百分比等）
+function formatSize(value: number | string): string {
+  if (typeof value === "number") {
+    return `${value}px`;
+  }
+  return value;
+}
+
+// 等待节点中所有图片加载完成
+async function waitForImages(node: HTMLElement): Promise<void> {
+  const images = node.querySelectorAll("img");
+  const promises: Promise<void>[] = [];
+  for (const img of images) {
+    if (img.complete && img.naturalWidth > 0) continue;
+    promises.push(
+      new Promise((resolve) => {
+        img.addEventListener("load", () => resolve(), { once: true });
+        img.addEventListener("error", () => resolve(), { once: true });
+      }),
+    );
+  }
+  await Promise.all(promises);
+}
+
+// 等待字体加载完成
+async function waitForFonts(): Promise<void> {
+  try {
+    if (document.fonts && document.fonts.ready) {
+      await document.fonts.ready;
+    }
+  } catch {
+    // 忽略字体加载错误
+  }
+  // 额外等待一小段时间，确保字体渲染
+  await new Promise((resolve) => setTimeout(resolve, 200));
+}
 
 // 渲染单个元素为内联样式对象（用于离屏渲染）
 export function renderElementStyle(
@@ -13,8 +50,8 @@ export function renderElementStyle(
     position: "absolute",
     left: `${el.x}px`,
     top: `${el.y}px`,
-    width: `${el.width}px`,
-    height: `${el.height}px`,
+    width: formatSize(el.width),
+    height: formatSize(el.height),
     transform: `rotate(${el.rotation}deg)`,
     opacity: String(el.opacity),
     zIndex: String(el.zIndex),
@@ -155,9 +192,11 @@ async function exportNodeToImage(
   format: ExportFormat,
   quality: number,
 ): Promise<string> {
+  await waitForImages(node);
+  await waitForFonts();
   const canvas = await html2canvas(node, {
     backgroundColor: null,
-    scale: 1.5,
+    scale: 2,
     useCORS: true,
     logging: false,
   });
@@ -171,9 +210,11 @@ async function exportNodeToBlob(
   format: ExportFormat,
   quality: number,
 ): Promise<Blob> {
+  await waitForImages(node);
+  await waitForFonts();
   const canvas = await html2canvas(node, {
     backgroundColor: null,
-    scale: 1.5,
+    scale: 2,
     useCORS: true,
     logging: false,
   });

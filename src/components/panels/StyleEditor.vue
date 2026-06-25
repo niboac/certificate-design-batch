@@ -250,6 +250,7 @@ const commonChars = ['.jpg', '.png', '.jpeg', '.gif', '/', '\\']
               type="text"
               class="form-input"
               :value="element.width"
+              placeholder="px / auto / %"
               @input="handleSizeInput('width', $event)"
             >
           </div>
@@ -259,6 +260,7 @@ const commonChars = ['.jpg', '.png', '.jpeg', '.gif', '/', '\\']
               type="text"
               class="form-input"
               :value="element.height"
+              placeholder="px / auto / %"
               @input="handleSizeInput('height', $event)"
             >
           </div>
