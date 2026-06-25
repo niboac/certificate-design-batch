@@ -153,3 +153,20 @@ async function drawText(
 function pxToPtSafe(px: number): number {
   return pxToPt(px);
 }
+
+// 字体不可用时的兜底：每页一张整页 PNG
+export async function renderRasterPdf(
+  pagePngs: Uint8Array[],
+  widthPx: number,
+  heightPx: number,
+): Promise<Uint8Array> {
+  const doc = await PDFDocument.create();
+  const wPt = pxToPt(widthPx);
+  const hPt = pxToPt(heightPx);
+  for (const png of pagePngs) {
+    const page = doc.addPage([wPt, hPt]);
+    const img = await doc.embedPng(png);
+    page.drawImage(img, { x: 0, y: 0, width: wPt, height: hPt });
+  }
+  return doc.save();
+}

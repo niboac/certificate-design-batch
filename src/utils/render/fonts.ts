@@ -154,3 +154,15 @@ export async function loadFontBundle(custom: CustomFontRegistry): Promise<FontBu
     fontFaces: [...parsedByKey.values()].map((p) => p.fontFace!).filter(Boolean),
   };
 }
+
+// 字体全部加载失败时的近似度量；canvas 用通用 sans-serif 绘制
+export function degenerateFontProvider(): FontProvider {
+  const handle: FontHandle = {
+    key: "", // 空 -> canvas2d 用通用 sans-serif
+    synthItalic: false,
+    advanceWidthPx: (ch, s) => (ch.charCodeAt(0) < 256 ? s * 0.5 : s), // 半角 0.5em / 全角 1em
+    ascentPx: (s) => s * 0.8,
+    descentPx: (s) => s * 0.2,
+  };
+  return { resolve: () => handle };
+}

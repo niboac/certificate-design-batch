@@ -3,8 +3,8 @@ import type { CanvasElement, DraftConfig, ExportFormat, PaperConfig } from "@/ty
 import { unitToPx } from "@/utils/element";
 import { computeLayout } from "./render/layout";
 import { renderToCanvas } from "./render/canvas2d";
-import { renderPdf } from "./render/pdf";
-import { loadFontBundle, type CustomFontRegistry } from "./render/fonts";
+import { renderPdf, renderRasterPdf } from "./render/pdf";
+import { loadFontBundle, degenerateFontProvider, type CustomFontRegistry, type FontBundle } from "./render/fonts";
 import type { DrawOp, ImageOp, ResolvedImage } from "./render/types";
 
 interface BatchExportOptions {
@@ -121,24 +121,48 @@ export async function batchExport(
   const widthPx = unitToPx(paper.width, paper.unit);
   const heightPx = unitToPx(paper.height, paper.unit);
 
-  const bundle = await loadFontBundle(customFonts ?? {});
+  let bundle: FontBundle | null = null;
+  try {
+    bundle = await loadFontBundle(customFonts ?? {});
+  } catch {
+    bundle = null; // 字体加载失败 -> 走光栅兜底
+  }
+  const provider = bundle ? bundle.provider : degenerateFontProvider();
 
   if (format === "pdf") {
-    const pdfPages: DrawOp[][] = [];
-    const pdfImages = new Map<string, Uint8Array>();
-    for (let i = 0; i < total; i++) {
-      const { images, elementImages, draftResolved } = await resolveRowImages(elements, rows[i], draft, resolvePhotoUrl);
-      const ops = computeLayout(elements, rows[i], paper, {
-        fonts: bundle.provider,
-        images,
-        draft: draftResolved ? { resolved: draftResolved, opacity: draft!.opacity } : null,
-      });
-      await prepareImagesForPdf(ops, elementImages, i, pdfImages);
-      pdfPages.push(ops);
-      onProgress?.(i + 1, total);
+    if (bundle) {
+      const pdfPages: DrawOp[][] = [];
+      const pdfImages = new Map<string, Uint8Array>();
+      for (let i = 0; i < total; i++) {
+        const { images, elementImages, draftResolved } = await resolveRowImages(elements, rows[i], draft, resolvePhotoUrl);
+        const ops = computeLayout(elements, rows[i], paper, {
+          fonts: provider,
+          images,
+          draft: draftResolved ? { resolved: draftResolved, opacity: draft!.opacity } : null,
+        });
+        await prepareImagesForPdf(ops, elementImages, i, pdfImages);
+        pdfPages.push(ops);
+        onProgress?.(i + 1, total);
+      }
+      const bytes = await renderPdf({ pages: pdfPages, widthPx, heightPx, bytesOf: bundle.bytesOf, images: pdfImages });
+      saveAs(new Blob([bytes], { type: "application/pdf" }), `${fileName}.pdf`);
+    } else {
+      const pngs: Uint8Array[] = [];
+      for (let i = 0; i < total; i++) {
+        const { images, elementImages, draftResolved } = await resolveRowImages(elements, rows[i], draft, resolvePhotoUrl);
+        const ops = computeLayout(elements, rows[i], paper, {
+          fonts: provider,
+          images,
+          draft: draftResolved ? { resolved: draftResolved, opacity: draft!.opacity } : null,
+        });
+        const canvas = renderToCanvas({ ops, widthPx, heightPx, deviceScale: 2, images: elementImages });
+        const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, "image/png"));
+        if (blob) pngs.push(new Uint8Array(await blob.arrayBuffer()));
+        onProgress?.(i + 1, total);
+      }
+      const bytes = await renderRasterPdf(pngs, widthPx, heightPx);
+      saveAs(new Blob([bytes], { type: "application/pdf" }), `${fileName}.pdf`);
     }
-    const bytes = await renderPdf({ pages: pdfPages, widthPx, heightPx, bytesOf: bundle.bytesOf, images: pdfImages });
-    saveAs(new Blob([bytes], { type: "application/pdf" }), `${fileName}.pdf`);
     return;
   }
 
@@ -147,7 +171,7 @@ export async function batchExport(
   for (let i = 0; i < total; i++) {
     const { images, elementImages, draftResolved } = await resolveRowImages(elements, rows[i], draft, resolvePhotoUrl);
     const ops = computeLayout(elements, rows[i], paper, {
-      fonts: bundle.provider,
+      fonts: provider,
       images,
       draft: draftResolved ? { resolved: draftResolved, opacity: draft!.opacity } : null,
     });

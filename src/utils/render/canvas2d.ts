@@ -95,7 +95,8 @@ function drawText(ctx: CanvasRenderingContext2D, op: TextOp) {
     ctx.clip();
     ctx.fillStyle = cssColor(op.color);
     const italic = op.font.synthItalic ? "italic " : "";
-    ctx.font = `${italic}${op.fontSizePx}px "${op.font.key}"`;
+    const fam = op.font.key ? `"${op.font.key}"` : "sans-serif";
+    ctx.font = `${italic}${op.fontSizePx}px ${fam}`;
     for (const line of op.lines) {
       for (const g of line.glyphs) {
         ctx.fillText(g.ch, g.x, line.baselineY);
