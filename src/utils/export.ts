@@ -29,11 +29,6 @@ function loadImage(url: string): Promise<HTMLImageElement> {
   });
 }
 
-async function urlToBytes(url: string): Promise<Uint8Array> {
-  const res = await fetch(url);
-  return new Uint8Array(await res.arrayBuffer());
-}
-
 // 收集某行用到的所有图片 url（含底稿），加载为 element + resolved
 async function resolveRowImages(
   elements: CanvasElement[],

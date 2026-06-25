@@ -56,11 +56,8 @@ interface ParsedFont {
   fontFace?: FontFace;
 }
 
-// fontkit.create 兼容 ESM named export 与 CJS default
-const fontkitCreate: (buf: Buffer | Uint8Array) => any =
-  typeof (fontkit as any).default?.create === "function"
-    ? (buf) => (fontkit as any).default.create(buf)
-    : (buf) => (fontkit as any).create(buf);
+// fontkit 无默认导出，使用命名空间上的 create（node 与浏览器构建均可用）
+const fontkitCreate = (buf: Buffer | Uint8Array): any => (fontkit as any).create(buf);
 
 // 用 fontkit 度量构造 FontHandle
 function makeHandle(parsed: ParsedFont, synthItalic: boolean): FontHandle {
