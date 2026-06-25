@@ -34,4 +34,13 @@ describe("computeObjectFit", () => {
     // none 显示 100x100 区域；contain 显示 100x50；取更小 => contain
     expect(r.dst).toEqual({ x: 0, y: 25, w: 100, h: 50 });
   });
+  it("none: 小图不缩放、居中（natural < box）", () => {
+    const r = computeObjectFit("none", { w: 50, h: 40 }, { w: 100, h: 100 });
+    expect(r.src).toEqual({ x: 0, y: 0, w: 50, h: 40 });
+    expect(r.dst).toEqual({ x: 25, y: 30, w: 50, h: 40 });
+  });
+  it("scale-down: 小图取 none（不放大）", () => {
+    const r = computeObjectFit("scale-down", { w: 50, h: 40 }, { w: 100, h: 100 });
+    expect(r.dst).toEqual({ x: 25, y: 30, w: 50, h: 40 });
+  });
 });

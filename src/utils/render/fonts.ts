@@ -28,7 +28,9 @@ const WEIGHT_NUM: Record<string, number> = {
 // 纯映射：把样式查询解析成角色
 export function resolveFontRole(q: FontStyleQuery): FontRole {
   const synthItalic = q.fontStyle === "italic";
-  const weight = WEIGHT_NUM[q.fontWeight] ?? Number(q.fontWeight) ?? 400;
+  const numericWeight = Number(q.fontWeight);
+  const weight =
+    WEIGHT_NUM[q.fontWeight] ?? (Number.isFinite(numericWeight) ? numericWeight : 400);
   const bold = weight >= 600;
 
   if (q.fontFamily.startsWith("custom_")) {

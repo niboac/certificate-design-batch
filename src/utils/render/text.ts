@@ -32,35 +32,42 @@ function wrapSegment(
   const lines: RawLine[] = [];
   let cur: string[] = [];
   let curW = 0;
-  let lastBreak = -1; // cur 中最近一个空格后的可断位置
+  let lastBreak = -1; // cur 中最近一个空格的索引（可断点）
 
-  const push = () => {
-    lines.push({ chars: cur, width: curW });
-    cur = [];
-    curW = 0;
-    lastBreak = -1;
+  const widthOf = (chars: string[]): number =>
+    chars.reduce((s, c) => s + advance(font, c, sizePx, lsPx), 0);
+  const pushLine = (chars: string[]): void => {
+    lines.push({ chars, width: widthOf(chars) });
   };
 
   for (const ch of text) {
+    const isSpace = ch === " ";
+    // 行首折叠空格：换行后开头的空格丢弃（与 CSS 折行一致，避免空白行）
+    if (isSpace && cur.length === 0) continue;
     const w = advance(font, ch, sizePx, lsPx);
     if (curW + w > maxW && cur.length > 0) {
-      if (lastBreak >= 0 && lastBreak < cur.length - 1) {
-        // 在最近空格处断行，余下挪到下一行
+      if (lastBreak >= 0) {
+        // 在最近空格处断行：空格本身折叠丢弃，前后分到两行
+        const before = cur.slice(0, lastBreak);
         const rest = cur.slice(lastBreak + 1);
-        cur = cur.slice(0, lastBreak + 1);
-        curW = cur.reduce((s, c) => s + advance(font, c, sizePx, lsPx), 0);
-        push();
+        pushLine(before);
         cur = rest;
-        curW = rest.reduce((s, c) => s + advance(font, c, sizePx, lsPx), 0);
+        curW = widthOf(rest);
       } else {
-        push();
+        // 无可断空格：按字符硬断
+        pushLine(cur);
+        cur = [];
+        curW = 0;
       }
+      lastBreak = -1;
+      // 断行后当前若为空格且新行已空，折叠丢弃
+      if (isSpace && cur.length === 0) continue;
     }
-    if (ch === " ") lastBreak = cur.length;
+    if (isSpace) lastBreak = cur.length;
     cur.push(ch);
     curW += w;
   }
-  push();
+  pushLine(cur);
   return lines;
 }
 
@@ -77,6 +84,9 @@ export function layoutText(params: LayoutTextParams): TextLine[] {
   // 垂直居中整块
   const blockH = raw.length * lineHeightPx;
   const ascent = font.ascentPx(fontSizePx);
+  const descent = font.descentPx(fontSizePx);
+  // 行内半行距：CSS 行框把 (lineHeight - 字体高) 的一半放在基线之上
+  const halfLeading = (lineHeightPx - (ascent + descent)) / 2;
   let top = inner.y + (inner.h - blockH) / 2;
   if (top < inner.y) top = inner.y; // 溢出时顶对齐（overflow:hidden 裁剪）
 
@@ -94,7 +104,7 @@ export function layoutText(params: LayoutTextParams): TextLine[] {
     }
     out.push({
       glyphs,
-      baselineY: top + i * lineHeightPx + ascent,
+      baselineY: top + i * lineHeightPx + halfLeading + ascent,
       width: line.width,
     });
   });

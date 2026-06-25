@@ -91,6 +91,19 @@ async function prepareImagesForPdf(
     canvas.width = Math.max(1, Math.round(im.dst.w * 2));
     canvas.height = Math.max(1, Math.round(im.dst.h * 2));
     const ctx = canvas.getContext("2d")!;
+    // 圆角裁剪：与 canvas 后端一致（cover/fill 时 dst=box，得到圆角框）
+    if (im.borderRadius > 0) {
+      const sx = canvas.width / im.dst.w;
+      const r = Math.min(im.borderRadius * sx, canvas.width / 2, canvas.height / 2);
+      ctx.beginPath();
+      ctx.moveTo(r, 0);
+      ctx.arcTo(canvas.width, 0, canvas.width, canvas.height, r);
+      ctx.arcTo(canvas.width, canvas.height, 0, canvas.height, r);
+      ctx.arcTo(0, canvas.height, 0, 0, r);
+      ctx.arcTo(0, 0, canvas.width, 0, r);
+      ctx.closePath();
+      ctx.clip();
+    }
     ctx.drawImage(src, im.src.x, im.src.y, im.src.w, im.src.h, 0, 0, canvas.width, canvas.height);
     const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, "image/png"));
     if (blob) {

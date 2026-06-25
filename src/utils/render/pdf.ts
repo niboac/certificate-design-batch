@@ -77,27 +77,36 @@ export async function renderPdf(input: PdfRenderInput): Promise<Uint8Array> {
 }
 
 function drawRect(page: PDFPage, op: RectOp, X: (n: number) => number, Y: (n: number) => number) {
-  // 旋转锚点：pdf-lib drawRectangle 以左下角(x,y)为锚、rotate 绕该锚点。
-  // 取元素左上角(px=op.x,op.y) 在 px 空间绕中心旋转后的点，作为锚点近似。
-  const anchorPx = rotatePoint(op.x, op.y + op.h, op.cx, op.cy + 0, op.rotationDeg);
-  const common = {
-    x: X(anchorPx.x),
-    y: Y(anchorPx.y),
-    width: pxToPtSafe(op.w),
-    height: pxToPtSafe(op.h),
-    rotate: degrees(-op.rotationDeg),
-    opacity: op.opacity,
-  };
+  // pdf-lib drawRectangle 以左下角为锚、rotate 绕该锚点。
+  // 取目标矩形左上角在 px 空间绕中心旋转后的点作锚点。
+  // 填充：整框
   if (op.fill && op.fill.a > 0) {
-    page.drawRectangle({ ...common, color: pdfRgb(op.fill), opacity: op.opacity * op.fill.a });
-  }
-  if (op.borderWidth > 0 && op.borderColor && op.borderColor.a > 0) {
+    const a = rotatePoint(op.x, op.y + op.h, op.cx, op.cy, op.rotationDeg);
     page.drawRectangle({
-      ...common,
-      borderWidth: pxToPtSafe(op.borderWidth),
+      x: X(a.x),
+      y: Y(a.y),
+      width: pxToPt(op.w),
+      height: pxToPt(op.h),
+      rotate: degrees(-op.rotationDeg),
+      color: pdfRgb(op.fill),
+      opacity: op.opacity * op.fill.a,
+    });
+  }
+  // 描边：border-box，与 canvas 一致向内缩半个边宽（描边居中于路径，故路径内缩 half）
+  if (op.borderWidth > 0 && op.borderColor && op.borderColor.a > 0) {
+    const half = op.borderWidth / 2;
+    const bw = op.w - op.borderWidth;
+    const bh = op.h - op.borderWidth;
+    const a = rotatePoint(op.x + half, op.y + half + bh, op.cx, op.cy, op.rotationDeg);
+    page.drawRectangle({
+      x: X(a.x),
+      y: Y(a.y),
+      width: pxToPt(bw),
+      height: pxToPt(bh),
+      rotate: degrees(-op.rotationDeg),
+      borderWidth: pxToPt(op.borderWidth),
       borderColor: pdfRgb(op.borderColor),
       borderOpacity: op.opacity * op.borderColor.a,
-      color: undefined,
     });
   }
 }

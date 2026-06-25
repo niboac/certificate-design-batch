@@ -85,4 +85,40 @@ describe("layoutText", () => {
     });
     expect(lines[0].glyphs[0].x).toBeCloseTo(30, 5);
   });
+
+  it("空格断行不产生空白行", () => {
+    // 每字 10px；inner.w=55 -> "hello"(50) 满，space 触发断行
+    const lines = layoutText({
+      text: "hello world",
+      font: mockFont,
+      fontSizePx: 20,
+      lineHeight: 1,
+      letterSpacingPx: 0,
+      align: "left",
+      inner: { x: 0, y: 0, w: 55, h: 100 },
+    });
+    const texts = lines.map((l) => l.glyphs.map((g) => g.ch).join(""));
+    expect(texts).toEqual(["hello", "world"]);
+    // 不存在仅含空白/空的行
+    expect(lines.every((l) => l.glyphs.some((g) => g.ch.trim() !== ""))).toBe(true);
+  });
+
+  it("行高>1 时基线含半行距（视觉垂直居中）", () => {
+    // size20: ascent16 descent4；lineHeight2 -> lineHeightPx40，halfLeading=(40-20)/2=10
+    const lines = layoutText({
+      text: "a",
+      font: mockFont,
+      fontSizePx: 20,
+      lineHeight: 2,
+      letterSpacingPx: 0,
+      align: "left",
+      inner: { x: 0, y: 0, w: 100, h: 100 },
+    });
+    // blockH=40, top=(100-40)/2=30; baseline=30 +0 +10 +16 = 56
+    expect(lines[0].baselineY).toBeCloseTo(56, 5);
+    // 字形视觉中心 = baseline + (descent-ascent)/2 应居中于 100 框 => 50
+    const visualCenter =
+      lines[0].baselineY + (mockFont.descentPx(20) - mockFont.ascentPx(20)) / 2;
+    expect(visualCenter).toBeCloseTo(50, 5);
+  });
 });
