@@ -29,7 +29,7 @@
 | `canvas2d.ts` | Canvas 2D 后端：`renderCanvas()` |
 
 改写：`src/utils/export.ts`（编排器，保留 `batchExport` 签名）、`src/stores/export.ts`（多传自定义字体注册表）。
-新增资源：`public/fonts/NotoSansSC-{Regular,Bold}.otf`、`public/fonts/NotoSerifSC-{Regular,Bold}.otf`。
+字体：运行时从 jsDelivr CDN 懒加载 SC 子集 OTF（NotoSansSC / NotoSerifSC，Regular/Bold），**不提交进仓库**。
 
 ---
 
@@ -1057,19 +1057,19 @@ git commit -m "feat(render): computeLayout 组装 DrawOp"
 **Files:**
 - Create: `src/utils/render/fonts.ts`
 - Test: `src/utils/render/fonts.test.ts`（仅测纯映射逻辑）
-- 资源: `public/fonts/NotoSansSC-Regular.otf` 等 4 个文件
+- 字体：运行时从 jsDelivr CDN 懒加载 SC 子集 OTF，**不提交进仓库**
 
 字体加载、fontkit 解析涉及网络/二进制，单测只覆盖**字体角色映射**纯函数 `resolveFontRole`。实际加载在浏览器中手工验证。
 
-- [ ] **Step 1: 下载绑定字体到 public/fonts/**
+- [ ] **Step 1: 确认 CDN 字体可达（不下载、不提交）**
+
+字体改为运行时从 jsDelivr CDN 懒加载（SC 子集 OTF，约 8–12MB/个，浏览器缓存）。先验证可达：
 
 ```bash
-mkdir -p public/fonts
-# 从 Google Fonts / 思源仓库获取以下 OFL 字体并放入 public/fonts/：
-#   NotoSansSC-Regular.otf  NotoSansSC-Bold.otf
-#   NotoSerifSC-Regular.otf NotoSerifSC-Bold.otf
+curl -s -o /dev/null -L --max-time 30 -w "%{http_code}\n" \
+  "https://cdn.jsdelivr.net/gh/notofonts/noto-cjk@main/Sans/SubsetOTF/SC/NotoSansSC-Regular.otf"
 ```
-Expected: `ls public/fonts` 列出 4 个 otf。（若用 ttf 版本，相应调整 Step 4 文件名常量。）
+Expected: `200`。jsDelivr 设 `access-control-allow-origin: *`，浏览器 `fetch().arrayBuffer()` 可跨域取字节，无需 `public/fonts/`。
 
 - [ ] **Step 2: 写失败测试（仅映射逻辑）**
 
@@ -1125,11 +1125,13 @@ export interface FontRole {
 // 自定义字体注册表：fontFamily -> 字体文件 URL（object URL）
 export type CustomFontRegistry = Record<string, string>;
 
+// 运行时从 jsDelivr CDN 懒加载 SC 子集字体（不提交进仓库）。@main 后续可 pin 到 release tag。
+const CDN = "https://cdn.jsdelivr.net/gh/notofonts/noto-cjk@main";
 const BUNDLED: Record<string, string> = {
-  "sans-Regular": "/fonts/NotoSansSC-Regular.otf",
-  "sans-Bold": "/fonts/NotoSansSC-Bold.otf",
-  "serif-Regular": "/fonts/NotoSerifSC-Regular.otf",
-  "serif-Bold": "/fonts/NotoSerifSC-Bold.otf",
+  "sans-Regular": `${CDN}/Sans/SubsetOTF/SC/NotoSansSC-Regular.otf`,
+  "sans-Bold": `${CDN}/Sans/SubsetOTF/SC/NotoSansSC-Bold.otf`,
+  "serif-Regular": `${CDN}/Serif/SubsetOTF/SC/NotoSerifSC-Regular.otf`,
+  "serif-Bold": `${CDN}/Serif/SubsetOTF/SC/NotoSerifSC-Bold.otf`,
 };
 
 const WEIGHT_NUM: Record<string, number> = {
@@ -1271,7 +1273,7 @@ Expected: PASS。
 - [ ] **Step 6: 提交**
 
 ```bash
-git add src/utils/render/fonts.ts src/utils/render/fonts.test.ts public/fonts
+git add src/utils/render/fonts.ts src/utils/render/fonts.test.ts
 git commit -m "feat(render): 字体服务（角色映射 + fontkit 度量 + 加载）"
 ```
 
@@ -1410,7 +1412,7 @@ git commit -m "feat(render): Canvas 2D 后端"
 
 **Files:**
 - Create: `src/utils/render/pdf.ts`
-- Test: `src/utils/render/pdf.test.ts`（node 下生成 PDF 冒烟测试）
+- Test: `src/utils/render/pdf.test.ts`（node：`rotatePoint` 纯函数确定性测试 + 联网取 CDN 字体的 PDF 生成冒烟测试，离线软跳过）
 
 pdf-lib 原点在左下角、单位 pt。需 y 翻转、px→pt。逐字 `drawText`，旋转用变换矩阵。
 
@@ -1418,60 +1420,73 @@ pdf-lib 原点在左下角、单位 pt。需 y 翻转、px→pt。逐字 `drawTe
 
 Create `src/utils/render/pdf.test.ts`:
 ```ts
-import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
+import { beforeAll, describe, expect, it } from "vitest";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import fontkit from "fontkit";
 import type { DrawOp, FontHandle } from "./types";
-import { renderPdf } from "./pdf";
+import { renderPdf, rotatePoint } from "./pdf";
 
-// 用真实绑定字体做度量与嵌入（确保 4 文件已就位）
-const sansBytes = new Uint8Array(readFileSync("public/fonts/NotoSansSC-Regular.otf"));
-const kit = (fontkit as any).create(sansBytes);
-const handle: FontHandle = {
-  key: "render_sans-Regular",
-  synthItalic: false,
-  advanceWidthPx: (ch, s) => {
-    const g = kit.glyphForCodePoint(ch.codePointAt(0) ?? 32);
-    return (g.advanceWidth / kit.unitsPerEm) * s;
-  },
-  ascentPx: (s) => (kit.ascent / kit.unitsPerEm) * s,
-  descentPx: (s) => (Math.abs(kit.descent) / kit.unitsPerEm) * s,
-};
+// rotatePoint 是纯函数，确定性测试（无需字体）
+describe("rotatePoint", () => {
+  it("不旋转返回原点", () => {
+    expect(rotatePoint(10, 20, 0, 0, 0)).toEqual({ x: 10, y: 20 });
+  });
+  it("绕原点旋转 90°：(10,0) -> (0,10)", () => {
+    const p = rotatePoint(10, 0, 0, 0, 90);
+    expect(p.x).toBeCloseTo(0, 5);
+    expect(p.y).toBeCloseTo(10, 5);
+  });
+  it("绕 (10,10) 旋转 180°：(12,10) -> (8,10)", () => {
+    const p = rotatePoint(12, 10, 10, 10, 180);
+    expect(p.x).toBeCloseTo(8, 5);
+    expect(p.y).toBeCloseTo(10, 5);
+  });
+});
 
-function bytesOf() {
-  return sansBytes;
-}
+// PDF 生成冒烟测试：从 CDN 取 SC 子集字体（缓存到 tmp）；离线则软跳过（早返回，不失败）
+const FONT_URL =
+  "https://cdn.jsdelivr.net/gh/notofonts/noto-cjk@main/Sans/SubsetOTF/SC/NotoSansSC-Regular.otf";
+const CACHE = join(tmpdir(), "noto-sans-sc-subset-test.otf");
+let sansBytes: Uint8Array | null = null;
+
+beforeAll(async () => {
+  try {
+    if (existsSync(CACHE)) {
+      sansBytes = new Uint8Array(readFileSync(CACHE));
+      return;
+    }
+    const res = await fetch(FONT_URL);
+    if (!res.ok) return;
+    const buf = new Uint8Array(await res.arrayBuffer());
+    writeFileSync(CACHE, buf);
+    sansBytes = buf;
+  } catch {
+    sansBytes = null; // 离线 -> 软跳过
+  }
+}, 60000);
 
 describe("renderPdf", () => {
-  it("生成含两页的 PDF 字节，文本可嵌入", async () => {
+  it("生成含两页的 PDF 字节，文本可嵌入（需联网取字体；离线软跳过）", async () => {
+    if (!sansBytes) return; // 离线软跳过，不失败
+    const kit = (fontkit as any).create(sansBytes);
+    const handle: FontHandle = {
+      key: "render_sans-Regular",
+      synthItalic: false,
+      advanceWidthPx: (ch, s) => {
+        const g = kit.glyphForCodePoint(ch.codePointAt(0) ?? 32);
+        return (g.advanceWidth / kit.unitsPerEm) * s;
+      },
+      ascentPx: (s) => (kit.ascent / kit.unitsPerEm) * s,
+      descentPx: (s) => (Math.abs(kit.descent) / kit.unitsPerEm) * s,
+    };
     const ops: DrawOp[] = [
-      {
-        kind: "rect",
-        x: 0, y: 0, w: 200, h: 100,
-        fill: { r: 1, g: 1, b: 1, a: 1 },
-        borderWidth: 0, borderColor: null, borderRadius: 0,
-        rotationDeg: 0, cx: 100, cy: 50, opacity: 1,
-      },
-      {
-        kind: "text",
-        clip: { x: 0, y: 0, w: 200, h: 100 },
-        lines: [{ glyphs: [{ ch: "证", x: 10 }, { ch: "书", x: 30 }], baselineY: 40, width: 40 }],
-        font: handle,
-        fontSizePx: 20,
-        color: { r: 0, g: 0, b: 0, a: 1 },
-        rotationDeg: 0, cx: 100, cy: 50, opacity: 1,
-      },
+      { kind: "rect", x: 0, y: 0, w: 200, h: 100, fill: { r: 1, g: 1, b: 1, a: 1 }, borderWidth: 0, borderColor: null, borderRadius: 0, rotationDeg: 0, cx: 100, cy: 50, opacity: 1 },
+      { kind: "text", clip: { x: 0, y: 0, w: 200, h: 100 }, lines: [{ glyphs: [{ ch: "证", x: 10 }, { ch: "书", x: 30 }], baselineY: 40, width: 40 }], font: handle, fontSizePx: 20, color: { r: 0, g: 0, b: 0, a: 1 }, rotationDeg: 0, cx: 100, cy: 50, opacity: 1 },
     ];
-    const pages = [ops, ops];
-    const bytes = await renderPdf({
-      pages,
-      widthPx: 200,
-      heightPx: 100,
-      bytesOf,
-      images: new Map(),
-    });
+    const bytes = await renderPdf({ pages: [ops, ops], widthPx: 200, heightPx: 100, bytesOf: () => sansBytes!, images: new Map() });
     expect(bytes.byteLength).toBeGreaterThan(1000);
-    // PDF 头
     expect(new TextDecoder().decode(bytes.slice(0, 5))).toBe("%PDF-");
   });
 });
@@ -1507,7 +1522,7 @@ function pdfRgb(c: RGBA) {
 // pdf-lib 没有暴露通用 CTM 包装，故用 page.pushOperators + 标准操作符。
 // 简化方案：rect/image/text 各自支持 pdf-lib 内置 rotate（绕锚点），锚点取旋转后位置。
 // 为与 canvas 对齐，这里统一用"绕元素中心旋转点"工具：把某点 p 绕中心 c 旋转 deg。
-function rotatePoint(px: number, py: number, cx: number, cy: number, deg: number) {
+export function rotatePoint(px: number, py: number, cx: number, cy: number, deg: number) {
   const rad = (deg * Math.PI) / 180;
   const dx = px - cx;
   const dy = py - cy;
@@ -1648,7 +1663,7 @@ function pxToPtSafe(px: number): number {
 - [ ] **Step 4: 运行确认通过**
 
 Run: `pnpm test src/utils/render/pdf.test.ts`
-Expected: PASS（生成 `%PDF-` 开头、>1KB 字节）。
+Expected: `rotatePoint` 3 个用例必过；`renderPdf` 用例联网时生成 `%PDF-` 开头、>1KB 字节并通过，离线时早返回软跳过（不失败）。
 
 - [ ] **Step 5: 提交**
 
