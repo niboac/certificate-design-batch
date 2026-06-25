@@ -1,330 +1,165 @@
-import html2canvas from "html2canvas";
-import jsPDF from "jspdf";
 import { saveAs } from "file-saver";
-import type { CanvasElement, CustomFont, DraftConfig, ExportFormat, PaperConfig } from "@/types";
-import { interpolateContent, unitToPx } from "@/utils/element";
+import type { CanvasElement, DraftConfig, ExportFormat, PaperConfig } from "@/types";
+import { unitToPx } from "@/utils/element";
+import { computeLayout } from "./render/layout";
+import { renderToCanvas } from "./render/canvas2d";
+import { renderPdf } from "./render/pdf";
+import { loadFontBundle, type CustomFontRegistry } from "./render/fonts";
+import type { DrawOp, ImageOp, ResolvedImage } from "./render/types";
 
-// 将尺寸值格式化为 CSS 字符串（支持数字、auto、百分比等）
-function formatSize(value: number | string): string {
-  if (typeof value === "number") {
-    return `${value}px`;
-  }
-  return value;
+interface BatchExportOptions {
+  format: ExportFormat;
+  quality: number;
+  fileName: string;
+  draft: DraftConfig | null;
+  customFonts?: CustomFontRegistry;
+  resolvePhotoUrl?: (pathTemplate: string, row: Record<string, string>) => string;
+  onStart?: (total: number) => void;
+  onProgress?: (current: number, total: number) => void;
 }
 
-// 等待节点中所有图片加载完成
-async function waitForImages(node: HTMLElement): Promise<void> {
-  const images = node.querySelectorAll("img");
-  const promises: Promise<void>[] = [];
-  for (const img of images) {
-    if (img.complete && img.naturalWidth > 0) continue;
-    promises.push(
-      new Promise((resolve) => {
-        img.addEventListener("load", () => resolve(), { once: true });
-        img.addEventListener("error", () => resolve(), { once: true });
-      }),
-    );
-  }
-  await Promise.all(promises);
+// 加载图片为 HTMLImageElement（拿自然尺寸）
+function loadImage(url: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error(`图片加载失败: ${url}`));
+    img.src = url;
+  });
 }
 
-// 等待字体加载完成
-async function waitForFonts(): Promise<void> {
-  try {
-    if (document.fonts && document.fonts.ready) {
-      await document.fonts.ready;
-    }
-  } catch {
-    // 忽略字体加载错误
-  }
-  // 额外等待一小段时间，确保字体渲染
-  await new Promise((resolve) => setTimeout(resolve, 200));
+async function urlToBytes(url: string): Promise<Uint8Array> {
+  const res = await fetch(url);
+  return new Uint8Array(await res.arrayBuffer());
 }
 
-// 渲染单个元素为内联样式对象（用于离屏渲染）
-export function renderElementStyle(
-  el: CanvasElement,
-  _row: Record<string, string>,
-): Record<string, string> {
-  const base: Record<string, string> = {
-    position: "absolute",
-    left: `${el.x}px`,
-    top: `${el.y}px`,
-    width: formatSize(el.width),
-    height: formatSize(el.height),
-    transform: `rotate(${el.rotation}deg)`,
-    opacity: String(el.opacity),
-    zIndex: String(el.zIndex),
-    boxSizing: "border-box",
-  };
-
-  if (el.type === "text") {
-    return {
-      ...base,
-      color: el.color,
-      fontFamily: el.fontFamily,
-      fontSize: `${el.fontSize}px`,
-      fontWeight: String(el.fontWeight),
-      fontStyle: el.fontStyle,
-      textAlign: el.textAlign,
-      lineHeight: String(el.lineHeight),
-      letterSpacing: `${el.letterSpacing}px`,
-      backgroundColor: el.backgroundColor,
-      borderWidth: `${el.borderWidth}px`,
-      borderStyle: el.borderWidth > 0 ? "solid" : "none",
-      borderColor: el.borderColor,
-      borderRadius: `${el.borderRadius}px`,
-      padding: `${el.padding}px`,
-      overflow: "hidden",
-      whiteSpace: "pre-wrap",
-      wordBreak: "break-word",
-      display: "flex",
-      alignItems: "center",
-      justifyContent:
-        el.textAlign === "center"
-          ? "center"
-          : el.textAlign === "right"
-            ? "flex-end"
-            : "flex-start",
-    };
-  }
-
-  return {
-    ...base,
-    backgroundColor: el.backgroundColor,
-    borderRadius: `${el.borderRadius}px`,
-    borderWidth: `${el.borderWidth}px`,
-    borderStyle: el.borderWidth > 0 ? "solid" : "none",
-    borderColor: el.borderColor,
-    overflow: "hidden",
-  };
-}
-
-// 渲染元素内容（替换变量）
-export function renderElementContent(
-  el: CanvasElement,
-  row: Record<string, string>,
-): string {
-  if (el.type === "text") {
-    return interpolateContent(el.content, row);
-  }
-  return "";
-}
-
-// 构建离屏渲染的 DOM 节点
-function buildOffscreenNode(
+// 收集某行用到的所有图片 url（含底稿），加载为 element + resolved
+async function resolveRowImages(
   elements: CanvasElement[],
   row: Record<string, string>,
-  paper: PaperConfig,
-  scale: number,
   draft: DraftConfig | null,
-  resolvePhotoUrl?: (pathTemplate: string, row: Record<string, string>) => string,
-): HTMLElement {
-  const widthPx = unitToPx(paper.width, paper.unit);
-  const heightPx = unitToPx(paper.height, paper.unit);
+  resolvePhotoUrl?: BatchExportOptions["resolvePhotoUrl"],
+): Promise<{
+  images: Map<string, ResolvedImage>;
+  elementImages: Map<string, HTMLImageElement>;
+  draftResolved: ResolvedImage | null;
+}> {
+  const images = new Map<string, ResolvedImage>();
+  const elementImages = new Map<string, HTMLImageElement>();
 
-  const container = document.createElement("div");
-  container.style.position = "fixed";
-  container.style.left = "-99999px";
-  container.style.top = "0";
-  container.style.width = `${widthPx}px`;
-  container.style.height = `${heightPx}px`;
-  container.style.backgroundColor = paper.backgroundColor;
-  container.style.overflow = "hidden";
-  container.style.transformOrigin = "top left";
-  container.style.transform = `scale(${scale})`;
+  for (const el of elements) {
+    if (el.type !== "image" || !el.visible) continue;
+    let url = "";
+    if (el.srcType === "static") url = el.src;
+    else if (el.srcType === "dynamic" && resolvePhotoUrl) url = resolvePhotoUrl(el.pathTemplate, row);
+    if (!url) continue;
+    try {
+      const img = await loadImage(url);
+      images.set(el.id, { url, naturalWidth: img.naturalWidth, naturalHeight: img.naturalHeight });
+      elementImages.set(url, img);
+    } catch {
+      // 跳过加载失败的图片
+    }
+  }
 
-  // 添加底稿图片
+  let draftResolved: ResolvedImage | null = null;
   if (draft) {
-    const draftNode = document.createElement("img");
-    draftNode.src = draft.src;
-    draftNode.style.position = "absolute";
-    draftNode.style.left = "0";
-    draftNode.style.top = "0";
-    draftNode.style.width = `${widthPx}px`;
-    draftNode.style.height = `${heightPx}px`;
-    draftNode.style.opacity = String(draft.opacity);
-    draftNode.style.pointerEvents = "none";
-    draftNode.style.zIndex = "0";
-    container.appendChild(draftNode);
+    try {
+      const img = await loadImage(draft.src);
+      draftResolved = { url: draft.src, naturalWidth: img.naturalWidth, naturalHeight: img.naturalHeight };
+      elementImages.set(draft.src, img);
+    } catch {
+      draftResolved = null;
+    }
   }
 
-  const sorted = [...elements]
-    .filter((el) => el.visible)
-    .sort((a, b) => a.zIndex - b.zIndex);
+  return { images, elementImages, draftResolved };
+}
 
-  for (const el of sorted) {
-    const node = document.createElement("div");
-    const style = renderElementStyle(el, row);
-    for (const [key, value] of Object.entries(style)) {
-      node.style.setProperty(key, value);
+// PDF 路径：把需要裁剪的 ImageOp 预裁剪为整图位图（pdf-lib 不支持源裁剪）。
+// 直接写入文档级 sink；用 pageIndex + 局部计数生成全局唯一 key，避免跨页/同图相互覆盖。
+async function prepareImagesForPdf(
+  ops: DrawOp[],
+  elementImages: Map<string, HTMLImageElement>,
+  pageIndex: number,
+  sink: Map<string, Uint8Array>,
+): Promise<void> {
+  let local = 0;
+  for (const op of ops) {
+    if (op.kind !== "image") continue;
+    const im = op as ImageOp;
+    const src = elementImages.get(im.url);
+    if (!src) continue;
+    // 裁剪到 src 区域，输出与 dst 同比例的整图
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(im.dst.w * 2));
+    canvas.height = Math.max(1, Math.round(im.dst.h * 2));
+    const ctx = canvas.getContext("2d")!;
+    ctx.drawImage(src, im.src.x, im.src.y, im.src.w, im.src.h, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, "image/png"));
+    if (blob) {
+      const key = `pdfimg:${pageIndex}:${local++}`; // 全局唯一，避免同图不同裁剪相互覆盖
+      sink.set(key, new Uint8Array(await blob.arrayBuffer()));
+      // 让该 op 指向预裁剪图，src 归一为整图（绘制时按 dst 画整图）
+      im.url = key;
+      im.src = { x: 0, y: 0, w: canvas.width, h: canvas.height };
     }
-
-    if (el.type === "text") {
-      node.textContent = renderElementContent(el, row);
-    } else if (el.type === "image") {
-      let imgSrc = "";
-      if (el.srcType === "static") {
-        imgSrc = el.src;
-      } else if (el.srcType === "dynamic" && resolvePhotoUrl) {
-        imgSrc = resolvePhotoUrl(el.pathTemplate, row);
-      }
-      if (imgSrc) {
-        const img = document.createElement("img");
-        img.src = imgSrc;
-        img.style.width = "100%";
-        img.style.height = "100%";
-        img.style.objectFit = el.fit;
-        node.appendChild(img);
-      }
-    }
-
-    container.appendChild(node);
   }
-
-  document.body.appendChild(container);
-  return container;
 }
 
-// 导出单页为图片 DataURL
-async function exportNodeToImage(
-  node: HTMLElement,
-  format: ExportFormat,
-  quality: number,
-): Promise<string> {
-  await waitForImages(node);
-  await waitForFonts();
-  const canvas = await html2canvas(node, {
-    backgroundColor: null,
-    scale: 2,
-    useCORS: true,
-    logging: false,
-  });
-  const mime = format === "jpg" ? "image/jpeg" : "image/png";
-  return canvas.toDataURL(mime, quality);
-}
-
-// 导出单页为 Blob（避免 base64 字符串转换）
-async function exportNodeToBlob(
-  node: HTMLElement,
-  format: ExportFormat,
-  quality: number,
-): Promise<Blob> {
-  await waitForImages(node);
-  await waitForFonts();
-  const canvas = await html2canvas(node, {
-    backgroundColor: null,
-    scale: 2,
-    useCORS: true,
-    logging: false,
-  });
-  const mime = format === "jpg" ? "image/jpeg" : "image/png";
-  return new Promise((resolve, reject) => {
-    canvas.toBlob(
-      (blob) => {
-        if (blob) resolve(blob);
-        else reject(new Error("canvas.toBlob 返回空值"));
-      },
-      mime,
-      quality,
-    );
-  });
-}
-
-// 批量导出
 export async function batchExport(
   elements: CanvasElement[],
   rows: Record<string, string>[],
   paper: PaperConfig,
-  options: {
-    format: ExportFormat;
-    quality: number;
-    fileName: string;
-    draft: DraftConfig | null;
-    resolvePhotoUrl?: (pathTemplate: string, row: Record<string, string>) => string;
-    onStart?: (total: number) => void;
-    onProgress?: (current: number, total: number) => void;
-  },
+  options: BatchExportOptions,
 ): Promise<void> {
-  const { format, quality, fileName, draft, resolvePhotoUrl, onStart, onProgress } = options;
+  const { format, quality, fileName, draft, customFonts, resolvePhotoUrl, onStart, onProgress } = options;
   const total = rows.length;
   onStart?.(total);
 
-  // DOM 层面不缩放，由 html2canvas 的 scale 参数控制分辨率
-  const scale = 1;
+  const widthPx = unitToPx(paper.width, paper.unit);
+  const heightPx = unitToPx(paper.height, paper.unit);
+
+  const bundle = await loadFontBundle(customFonts ?? {});
 
   if (format === "pdf") {
-    const pdf = new jsPDF({
-      orientation: paper.orientation,
-      unit: paper.unit,
-      format: [paper.width, paper.height],
-      compress: true,
-    });
-
+    const pdfPages: DrawOp[][] = [];
+    const pdfImages = new Map<string, Uint8Array>();
     for (let i = 0; i < total; i++) {
-      const node = buildOffscreenNode(elements, rows[i], paper, scale, draft, resolvePhotoUrl);
-      try {
-        // PDF 内部使用 JPEG 格式，体积远小于 PNG，避免字符串超长
-        const dataUrl = await exportNodeToImage(node, "jpg", quality);
-        if (i > 0) pdf.addPage([paper.width, paper.height], paper.orientation);
-        pdf.addImage(
-          dataUrl,
-          "JPEG",
-          0,
-          0,
-          paper.width,
-          paper.height,
-          undefined,
-          "FAST",
-        );
-      } finally {
-        document.body.removeChild(node);
-      }
+      const { images, elementImages, draftResolved } = await resolveRowImages(elements, rows[i], draft, resolvePhotoUrl);
+      const ops = computeLayout(elements, rows[i], paper, {
+        fonts: bundle.provider,
+        images,
+        draft: draftResolved ? { resolved: draftResolved, opacity: draft!.opacity } : null,
+      });
+      await prepareImagesForPdf(ops, elementImages, i, pdfImages);
+      pdfPages.push(ops);
       onProgress?.(i + 1, total);
     }
-
-    // 使用 output('blob') + saveAs 替代 pdf.save()，避免字符串拼接超限
-    const blob = pdf.output("blob");
-    saveAs(blob, `${fileName}.pdf`);
+    const bytes = await renderPdf({ pages: pdfPages, widthPx, heightPx, bytesOf: bundle.bytesOf, images: pdfImages });
+    saveAs(new Blob([bytes], { type: "application/pdf" }), `${fileName}.pdf`);
     return;
   }
 
-  // 图片格式：每行导出一张，逐张下载
+  // PNG / JPG：逐行 canvas → blob → 下载
+  const deviceScale = 2;
   for (let i = 0; i < total; i++) {
-    const node = buildOffscreenNode(elements, rows[i], paper, scale, draft, resolvePhotoUrl);
-    try {
-      const blob = await exportNodeToBlob(node, format, quality);
-      saveAs(blob, `${fileName}_${i + 1}.${format}`);
-    } finally {
-      document.body.removeChild(node);
-    }
+    const { images, elementImages, draftResolved } = await resolveRowImages(elements, rows[i], draft, resolvePhotoUrl);
+    const ops = computeLayout(elements, rows[i], paper, {
+      fonts: bundle.provider,
+      images,
+      draft: draftResolved ? { resolved: draftResolved, opacity: draft!.opacity } : null,
+    });
+    const canvas = renderToCanvas({ ops, widthPx, heightPx, deviceScale, images: elementImages });
+    const mime = format === "jpg" ? "image/jpeg" : "image/png";
+    const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, mime, quality));
+    if (blob) saveAs(blob, `${fileName}_${i + 1}.${format}`);
     onProgress?.(i + 1, total);
   }
 }
 
-// 导出当前预览页为单张图片（用于快速预览）
-export async function exportPreview(
-  node: HTMLElement,
-  format: ExportFormat,
-  quality: number,
-): Promise<string> {
-  const canvas = await html2canvas(node, {
-    backgroundColor: null,
-    scale: 2,
-    useCORS: true,
-    logging: false,
-  });
-  const mime = format === "jpg" ? "image/jpeg" : "image/png";
-  return canvas.toDataURL(mime, quality);
-}
-
-// 计算稿纸像素尺寸
-export function getPaperPixelSize(paper: PaperConfig): {
-  width: number;
-  height: number;
-} {
-  return {
-    width: unitToPx(paper.width, paper.unit),
-    height: unitToPx(paper.height, paper.unit),
-  };
+// 计算稿纸像素尺寸（保留旧导出，供 UI 用）
+export function getPaperPixelSize(paper: PaperConfig): { width: number; height: number } {
+  return { width: unitToPx(paper.width, paper.unit), height: unitToPx(paper.height, paper.unit) };
 }
