@@ -1112,7 +1112,7 @@ Expected: FAIL（找不到 `./fonts`）。
 
 Create `src/utils/render/fonts.ts`:
 ```ts
-import fontkit from "fontkit";
+import * as fontkit from "fontkit"; // 注意：fontkit 无默认导出，须用命名空间导入
 import type { FontProvider, FontStyleQuery, FontHandle } from "./types";
 
 export interface FontRole {
@@ -1424,7 +1424,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import fontkit from "fontkit";
+import * as fontkit from "fontkit"; // 注意：fontkit 无默认导出，须用命名空间导入
 import type { DrawOp, FontHandle } from "./types";
 import { renderPdf, rotatePoint } from "./pdf";
 
