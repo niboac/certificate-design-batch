@@ -62,6 +62,9 @@ export const useExportStore = defineStore('export', () => {
           quality: quality.value,
           fileName: fileName.value || '批量导出',
           draft: includeDraft.value ? canvasStore.draft : null,
+          customFonts: Object.fromEntries(
+            fontsStore.customFonts.map((f) => [f.name, f.url]),
+          ),
           resolvePhotoUrl: (pathTemplate, row) => photosStore.resolvePhotoUrl(pathTemplate, row),
           onProgress: (current) => {
             progress.value = current
