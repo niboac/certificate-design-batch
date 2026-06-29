@@ -26,6 +26,8 @@ export interface FontStyleQuery {
 export interface FontHandle {
   // 后端据此挑选绘制字体（pdf 嵌入字体 / canvas FontFace）
   key: string;
+  // 原始字体家族名（canvas 渲染用，如 "Microsoft YaHei"）
+  familyName: string;
   // 单字符在给定字号下的步进宽度（px）
   advanceWidthPx(ch: string, fontSizePx: number): number;
   // 给定字号下的上行高（px，正数）

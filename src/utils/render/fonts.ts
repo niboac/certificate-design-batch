@@ -62,11 +62,12 @@ interface ParsedFont {
 const fontkitCreate = (buf: Buffer | Uint8Array): any => (fontkit as any).create(buf);
 
 // 用 fontkit 度量构造 FontHandle
-function makeHandle(parsed: ParsedFont, synthItalic: boolean): FontHandle {
+function makeHandle(parsed: ParsedFont, familyName: string, synthItalic: boolean): FontHandle {
   const kit = parsed.kit;
   const unitsPerEm: number = kit.unitsPerEm;
   return {
     key: parsed.key,
+    familyName,
     synthItalic,
     advanceWidthPx(ch, sizePx) {
       const cp = ch.codePointAt(0) ?? 32;
@@ -138,7 +139,7 @@ export async function loadFontBundle(custom: CustomFontRegistry): Promise<FontBu
       const role = resolveFontRole(q);
       const k = keyFor(role);
       const parsed = parsedByKey.get(k)!;
-      return makeHandle(parsed, role.synthItalic);
+      return makeHandle(parsed, q.fontFamily, role.synthItalic);
     },
   };
 
@@ -158,6 +159,7 @@ export async function loadFontBundle(custom: CustomFontRegistry): Promise<FontBu
 export function degenerateFontProvider(): FontProvider {
   const handle: FontHandle = {
     key: "", // 空 -> canvas2d 用通用 sans-serif
+    familyName: "sans-serif", // 使用通用字体名作为 fallback
     synthItalic: false,
     advanceWidthPx: (ch, s) => (ch.charCodeAt(0) < 256 ? s * 0.5 : s), // 半角 0.5em / 全角 1em
     ascentPx: (s) => s * 0.8,

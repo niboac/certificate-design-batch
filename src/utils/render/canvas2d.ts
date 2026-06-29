@@ -95,8 +95,9 @@ function drawText(ctx: CanvasRenderingContext2D, op: TextOp) {
     ctx.clip();
     ctx.fillStyle = cssColor(op.color);
     const italic = op.font.synthItalic ? "italic " : "";
-    const fam = op.font.key ? `"${op.font.key}"` : "sans-serif";
-    ctx.font = `${italic}${op.fontSizePx}px ${fam}`;
+    // 优先使用原始字体名，fallback 到通用 sans-serif
+    const fam = op.font.familyName || "sans-serif";
+    ctx.font = `${italic}${op.fontSizePx}px "${fam}"`;
     for (const line of op.lines) {
       for (const g of line.glyphs) {
         ctx.fillText(g.ch, g.x, line.baselineY);
