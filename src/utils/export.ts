@@ -132,11 +132,17 @@ export async function batchExport(
   const heightPx = unitToPx(paper.height, paper.unit);
 
   let bundle: FontBundle | null = null;
+  // 等待页面字体（含用户上传的自定义字体）就绪
+  if (typeof document !== "undefined") {
+    await document.fonts.ready;
+  }
   try {
     bundle = await loadFontBundle(customFonts ?? {}, systemFonts ?? {});
   } catch {
-    bundle = null; // 字体加载失败 -> 走光栅兜底
+    bundle = null; // 字体加载失败 -> 走系统字体直通
   }
+  // 使用系统字体直通 provider：保留用户选择的 fontFamily，Canvas 2D 渲染时浏览器自动匹配系统字体
+  // 度量使用近似值（半角 0.5em / 全角 1em），但字体渲染完全由系统字体决定
   const provider = bundle ? bundle.provider : degenerateFontProvider();
 
   onStart?.(total);

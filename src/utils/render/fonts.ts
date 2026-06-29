@@ -41,10 +41,10 @@ export function resolveFontRole(q: FontStyleQuery): FontRole {
     return { family: "custom", bold, synthItalic, customName: q.fontFamily };
   }
 
-  // 判断是否为衬线字体
+  // 判断是否为衬线字体（排除 "sans-serif" 的情况）
   const lower = q.fontFamily.toLowerCase();
   const isSerif =
-    lower.includes("serif") ||
+    (!lower.includes("sans") && lower.includes("serif")) ||
     lower.includes("song") ||
     lower.includes("sun") ||
     lower.includes("宋") ||
@@ -80,7 +80,7 @@ function makeHandle(parsed: ParsedFont, familyName: string, synthItalic: boolean
   const unitsPerEm: number = kit.unitsPerEm;
   return {
     key: parsed.key,
-    familyName: parsed.key,
+    familyName,
     synthItalic,
     advanceWidthPx(ch, sizePx) {
       const cp = ch.codePointAt(0) ?? 32;
@@ -147,8 +147,12 @@ export async function loadFontBundle(
     systemFontKeys.set(name, key);
   }
 
-  // 预加载 CDN 基础字体（确保兜底字体始终可用）
-  for (const [k, url] of Object.entries(BUNDLED)) await ensure(k, url);
+  // 预加载 CDN 基础字体（仅用于度量计算和 PDF 嵌入兜底）
+  // 不注册为中文字体别名，避免污染 document.fonts 覆盖系统字体
+  await ensure("serif-Regular", BUNDLED["serif-Regular"], "__noto_serif_sc__");
+  await ensure("serif-Bold", BUNDLED["serif-Bold"], "__noto_serif_sc_bold__");
+  await ensure("sans-Regular", BUNDLED["sans-Regular"], "__noto_sans_sc__");
+  await ensure("sans-Bold", BUNDLED["sans-Bold"], "__noto_sans_sc_bold__");
 
   // 自定义字体
   for (const [name, url] of Object.entries(custom)) await ensure(`custom-${name}`, url);
@@ -190,7 +194,7 @@ export async function loadFontBundle(
       const role = resolveFontRole(q);
       let k = keyFor(role);
 
-      // 如果没有匹配到，尝试加载 CDN fallback 字体
+      // 如果没有匹配到，尝试加载 CDN fallback 字体（仅用于度量计算）
       if (!k) {
         const lower = q.fontFamily.toLowerCase();
         const isSerif =
@@ -224,6 +228,17 @@ export async function loadFontBundle(
       }
 
       const parsed = parsedByKey.get(k)!;
+
+      // 对于系统字体和自定义字体：直接使用已注册的 FontFace
+      // 对于 CDN 兜底字体：仅用于度量计算，不注册为用户字体名的别名
+      // Canvas 2D 渲染时直接使用用户选择的 font-family 字符串，浏览器会自动匹配系统字体
+      if (k.startsWith("system-") || k.startsWith("custom-")) {
+        // 系统字体或自定义字体：用 fontkit 提供精确度量，familyName 保留原始名
+        return makeHandle(parsed, q.fontFamily, role.synthItalic);
+      }
+
+      // CDN 兜底路径：使用 CDN 字体的精确度量，但 familyName 保留用户选择的字体名
+      // 这样 Canvas 2D 渲染时会尝试系统字体，而不是被 CDN 字体替代
       return makeHandle(parsed, q.fontFamily, role.synthItalic);
     },
   };

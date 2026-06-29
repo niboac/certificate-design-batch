@@ -86,6 +86,23 @@ function drawImage(ctx: CanvasRenderingContext2D, op: ImageOp, images: Map<strin
   });
 }
 
+// Canvas 2D 的 ctx.font 需要每个字体名正确引用
+// 通用字体族名（serif 等）不加引号，其他字体名加引号
+const GENERIC_FAMILIES = new Set(["serif", "sans-serif", "monospace", "cursive", "fantasy", "system-ui"]);
+
+function quoteFontFamily(raw: string): string {
+  return raw
+    .split(",")
+    .map((f) => {
+      const trimmed = f.trim().replace(/["']/g, "");
+      if (!trimmed) return "";
+      if (GENERIC_FAMILIES.has(trimmed.toLowerCase())) return trimmed;
+      return `"${trimmed}"`;
+    })
+    .filter(Boolean)
+    .join(", ");
+}
+
 function drawText(ctx: CanvasRenderingContext2D, op: TextOp) {
   withTransform(ctx, op, () => {
     ctx.save();
@@ -95,9 +112,9 @@ function drawText(ctx: CanvasRenderingContext2D, op: TextOp) {
     ctx.clip();
     ctx.fillStyle = cssColor(op.color);
     const italic = op.font.synthItalic ? "italic " : "";
-    // 优先使用原始字体名，fallback 到通用 sans-serif
-    const fam = op.font.familyName || "sans-serif";
-    ctx.font = `${italic}${op.fontSizePx}px "${fam}"`;
+    // 使用原始 fontFamily 字符串，正确引用每个字体名让 Canvas 按 CSS fallback 链匹配系统字体
+    const fam = quoteFontFamily(op.font.familyName || "sans-serif");
+    ctx.font = `${italic}${op.fontSizePx}px ${fam}`;
     for (const line of op.lines) {
       for (const g of line.glyphs) {
         ctx.fillText(g.ch, g.x, line.baselineY);
