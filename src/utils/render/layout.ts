@@ -6,12 +6,12 @@ import { layoutText } from "./text";
 import { parseLength } from "./units";
 import type { DrawOp, ImageOp, LayoutDeps, RectOp, TextOp } from "./types";
 
-export function computeLayout(
+export async function computeLayout(
   elements: CanvasElement[],
   row: Record<string, string>,
   paper: PaperConfig,
   deps: LayoutDeps,
-): DrawOp[] {
+): Promise<DrawOp[]> {
   const paperW = unitToPx(paper.width, paper.unit);
   const paperH = unitToPx(paper.height, paper.unit);
   const ops: DrawOp[] = [];
@@ -83,7 +83,7 @@ export function computeLayout(
     if (el.type === "text") {
       const inset = el.borderWidth + el.padding;
       const inner = { x: el.x + inset, y: el.y + inset, w: w - 2 * inset, h: h - 2 * inset };
-      const font = deps.fonts.resolve({
+      const font = await deps.fonts.resolve({
         fontFamily: el.fontFamily,
         fontWeight: el.fontWeight,
         fontStyle: el.fontStyle,

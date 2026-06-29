@@ -39,7 +39,7 @@ export interface FontHandle {
 }
 
 export interface FontProvider {
-  resolve(query: FontStyleQuery): FontHandle;
+  resolve(query: FontStyleQuery): Promise<FontHandle>;
 }
 
 // 预解析后的图片

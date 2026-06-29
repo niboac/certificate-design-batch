@@ -196,6 +196,34 @@ export const useFontsStore = defineStore('fonts', () => {
     return found?.label ?? fontName
   }
 
+  // 根据字体名获取系统字体的二进制数据（用于 PDF 嵌入）
+  async function getSystemFontBlob(fontFamily: string, weight: string = 'normal', style: string = 'normal'): Promise<ArrayBuffer | null> {
+    if (!checkApiSupport() || !permissionGranted.value) {
+      return null
+    }
+
+    try {
+      // 查询所有字体
+      const fontData = await navigator.fonts.query({
+        family: fontFamily,
+        weight,
+        style,
+      } as FontQueryOptions)
+
+      // 找到最匹配的字体
+      if (fontData.length > 0) {
+        const font = fontData[0]
+        if (typeof font.blob === 'function') {
+          const blob = await font.blob()
+          return await blob.arrayBuffer()
+        }
+      }
+      return null
+    } catch {
+      return null
+    }
+  }
+
   return {
     fonts,
     loading,
@@ -209,5 +237,6 @@ export const useFontsStore = defineStore('fonts', () => {
     getFontLabel,
     addCustomFont,
     removeCustomFont,
+    getSystemFontBlob,
   }
 })

@@ -4,7 +4,7 @@ import { unitToPx } from "@/utils/element";
 import { computeLayout } from "./render/layout";
 import { renderToCanvas } from "./render/canvas2d";
 import { renderPdf, renderRasterPdf } from "./render/pdf";
-import { loadFontBundle, degenerateFontProvider, type CustomFontRegistry, type FontBundle } from "./render/fonts";
+import { loadFontBundle, degenerateFontProvider, type CustomFontRegistry, type SystemFontRegistry, type FontBundle } from "./render/fonts";
 import type { DrawOp, ImageOp, ResolvedImage } from "./render/types";
 
 interface BatchExportOptions {
@@ -13,6 +13,7 @@ interface BatchExportOptions {
   fileName: string;
   draft: DraftConfig | null;
   customFonts?: CustomFontRegistry;
+  systemFonts?: SystemFontRegistry;
   resolvePhotoUrl?: (pathTemplate: string, row: Record<string, string>) => string;
   onPrepare?: () => void;
   onStart?: (total: number) => void;
@@ -123,7 +124,7 @@ export async function batchExport(
   paper: PaperConfig,
   options: BatchExportOptions,
 ): Promise<void> {
-  const { format, quality, fileName, draft, customFonts, resolvePhotoUrl, onPrepare, onStart, onProgress } = options;
+  const { format, quality, fileName, draft, customFonts, systemFonts, resolvePhotoUrl, onPrepare, onStart, onProgress } = options;
   const total = rows.length;
   onPrepare?.();
 
@@ -132,7 +133,7 @@ export async function batchExport(
 
   let bundle: FontBundle | null = null;
   try {
-    bundle = await loadFontBundle(customFonts ?? {});
+    bundle = await loadFontBundle(customFonts ?? {}, systemFonts ?? {});
   } catch {
     bundle = null; // 字体加载失败 -> 走光栅兜底
   }
@@ -141,11 +142,12 @@ export async function batchExport(
   onStart?.(total);
 
   if (format === "pdf") {
-    // 使用光栅模式导出 PDF（Canvas 渲染 → 图片 → PDF），确保中文等复杂文字正确显示
+    // 默认使用光栅模式导出 PDF（Canvas 渲染 → 图片 → PDF）
+    // 优势：使用本机系统字体，渲染效果最稳定，不会出现乱码，字体和设计完全一致
     const pngs: Uint8Array[] = [];
     for (let i = 0; i < total; i++) {
       const { images, elementImages, draftResolved } = await resolveRowImages(elements, rows[i], draft, resolvePhotoUrl);
-      const ops = computeLayout(elements, rows[i], paper, {
+      const ops = await computeLayout(elements, rows[i], paper, {
         fonts: provider,
         images,
         draft: draftResolved ? { resolved: draftResolved, opacity: draft!.opacity } : null,
@@ -164,7 +166,7 @@ export async function batchExport(
   const deviceScale = 2;
   for (let i = 0; i < total; i++) {
     const { images, elementImages, draftResolved } = await resolveRowImages(elements, rows[i], draft, resolvePhotoUrl);
-    const ops = computeLayout(elements, rows[i], paper, {
+    const ops = await computeLayout(elements, rows[i], paper, {
       fonts: provider,
       images,
       draft: draftResolved ? { resolved: draftResolved, opacity: draft!.opacity } : null,

@@ -1,11 +1,12 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import type { ExportFormat } from '@/types'
+import type { ExportFormat, FontWeight, FontStyle } from '@/types'
 import { batchExport } from '@/utils/export'
 import { useCanvasStore } from './canvas'
 import { useExcelStore } from './excel'
 import { usePhotosStore } from './photos'
 import { useFontsStore } from './fonts'
+import type { SystemFontRegistry } from '@/utils/render/fonts'
 
 // 导出 Store：管理导出配置与进度
 export const useExportStore = defineStore('export', () => {
@@ -20,6 +21,60 @@ export const useExportStore = defineStore('export', () => {
   const total = ref(0)
   const error = ref<string>('')
   const includeDraft = ref(false)
+
+  // 收集画布中用到的字体（去重）
+  function collectUsedFonts(elements: ReturnType<typeof useCanvasStore>['elements']): Array<{ family: string; weight: FontWeight; style: FontStyle }> {
+    const fontSet = new Set<string>()
+    const result: Array<{ family: string; weight: FontWeight; style: FontStyle }> = []
+
+    for (const el of elements) {
+      if (el.type !== 'text' || !el.visible) continue
+      const key = `${el.fontFamily}|${el.fontWeight}|${el.fontStyle}`
+      if (!fontSet.has(key)) {
+        fontSet.add(key)
+        result.push({
+          family: el.fontFamily,
+          weight: el.fontWeight,
+          style: el.fontStyle,
+        })
+      }
+    }
+
+    return result
+  }
+
+  // 从系统字体 API 获取字体二进制数据
+  async function collectSystemFonts(elements: ReturnType<typeof useCanvasStore>['elements']): Promise<SystemFontRegistry> {
+    const fontsStore = useFontsStore()
+    const systemFonts: SystemFontRegistry = {}
+
+    // 只有当 Font Access API 支持且有权限时才尝试获取
+    if (!fontsStore.apiSupported || !fontsStore.permissionGranted) {
+      return systemFonts
+    }
+
+    const usedFonts = collectUsedFonts(elements)
+
+    for (const font of usedFonts) {
+      // 跳过自定义字体（custom_ 开头的）
+      if (font.family.startsWith('custom_')) continue
+
+      // 提取基础字体名（去掉 fallback 部分）
+      const baseFamily = font.family.split(',')[0].trim().replace(/["']/g, '')
+      if (systemFonts[baseFamily]) continue
+
+      try {
+        const buffer = await fontsStore.getSystemFontBlob(baseFamily, font.weight, font.style)
+        if (buffer) {
+          systemFonts[baseFamily] = buffer
+        }
+      } catch {
+        // 单个字体获取失败不影响整体流程
+      }
+    }
+
+    return systemFonts
+  }
 
   // 执行批量导出
   async function runExport(): Promise<void> {
@@ -50,6 +105,9 @@ export const useExportStore = defineStore('export', () => {
     total.value = rows.length
 
     try {
+      // 收集系统字体（用于 PDF 矢量导出时嵌入）
+      const systemFonts = await collectSystemFonts(canvasStore.elements)
+
       await batchExport(
         canvasStore.elements,
         rows,
@@ -62,6 +120,7 @@ export const useExportStore = defineStore('export', () => {
           customFonts: Object.fromEntries(
             fontsStore.customFonts.map((f) => [f.name, f.url]),
           ),
+          systemFonts,
           resolvePhotoUrl: (pathTemplate, row) => photosStore.resolvePhotoUrl(pathTemplate, row),
           onPrepare: () => {
             preparing.value = true
