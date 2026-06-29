@@ -88,7 +88,6 @@ export function layoutText(params: LayoutTextParams): TextLine[] {
   // 行内半行距：CSS 行框把 (lineHeight - 字体高) 的一半放在基线之上
   const halfLeading = (lineHeightPx - (ascent + descent)) / 2;
   let top = inner.y + (inner.h - blockH) / 2;
-  if (top < inner.y) top = inner.y; // 溢出时顶对齐（overflow:hidden 裁剪）
 
   const out: TextLine[] = [];
   raw.forEach((line, i) => {
