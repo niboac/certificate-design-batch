@@ -9,6 +9,7 @@ interface LayoutTextParams {
   letterSpacingPx: number;
   align: TextAlign;
   inner: Rect; // 内容区（已扣除 border + padding），绝对坐标
+  isHeightAuto?: boolean;
 }
 
 interface RawLine {
@@ -72,7 +73,7 @@ function wrapSegment(
 }
 
 export function layoutText(params: LayoutTextParams): TextLine[] {
-  const { text, font, fontSizePx, lineHeight, letterSpacingPx, align, inner } = params;
+  const { text, font, fontSizePx, lineHeight, letterSpacingPx, align, inner, isHeightAuto } = params;
   const lineHeightPx = lineHeight * fontSizePx;
 
   // 先按显式换行符切，再各自按宽度折行
@@ -87,7 +88,12 @@ export function layoutText(params: LayoutTextParams): TextLine[] {
   const descent = font.descentPx(fontSizePx);
   // 行内半行距：CSS 行框把 (lineHeight - 字体高) 的一半放在基线之上
   const halfLeading = (lineHeightPx - (ascent + descent)) / 2;
-  let top = inner.y + (inner.h - blockH) / 2;
+  let top: number;
+  if (isHeightAuto) {
+    top = inner.y;
+  } else {
+    top = inner.y + (inner.h - blockH) / 2;
+  }
 
   const out: TextLine[] = [];
   raw.forEach((line, i) => {

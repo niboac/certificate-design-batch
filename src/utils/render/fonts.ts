@@ -16,15 +16,6 @@ export type CustomFontRegistry = Record<string, string>;
 // 系统字体注册表：fontFamily -> 字体文件 ArrayBuffer
 export type SystemFontRegistry = Record<string, ArrayBuffer>;
 
-// 运行时从 jsDelivr CDN 懒加载 SC 子集字体（不提交进仓库）。@main 后续可 pin 到 release tag。
-const CDN = "https://cdn.jsdelivr.net/gh/notofonts/noto-cjk@main";
-const BUNDLED: Record<string, string> = {
-  "sans-Regular": `${CDN}/Sans/SubsetOTF/SC/NotoSansSC-Regular.otf`,
-  "sans-Bold": `${CDN}/Sans/SubsetOTF/SC/NotoSansSC-Bold.otf`,
-  "serif-Regular": `${CDN}/Serif/SubsetOTF/SC/NotoSerifSC-Regular.otf`,
-  "serif-Bold": `${CDN}/Serif/SubsetOTF/SC/NotoSerifSC-Bold.otf`,
-};
-
 const WEIGHT_NUM: Record<string, number> = {
   normal: 400,
   bold: 700,
@@ -56,7 +47,6 @@ export function resolveFontRole(q: FontStyleQuery): FontRole {
     lower.includes("times") ||
     lower.includes("georgia");
 
-  // 保留 serif/sans 分类用于 CDN fallback，同时记录 systemName 用于系统字体匹配
   return {
     family: isSerif ? "serif" : "sans",
     bold,
@@ -79,6 +69,27 @@ const fontkitCreate = (buf: Buffer | Uint8Array): any => (fontkit as any).create
 function makeHandle(parsed: ParsedFont, familyName: string, synthItalic: boolean, fontWeight?: FontWeight): FontHandle {
   const kit = parsed.kit;
   const unitsPerEm: number = kit.unitsPerEm;
+
+  // 计算字体的实际 ascent/descent（使用 bbox 或设计度量）
+  let fontAscent: number;
+  let fontDescent: number;
+  try {
+    // 尝试使用字体的 bbox（更准确的视觉边界）
+    const bbox = kit.bbox;
+    if (bbox) {
+      fontAscent = bbox.maxY;
+      fontDescent = Math.abs(bbox.minY);
+    } else {
+      // fallback 到字体设计度量
+      fontAscent = kit.ascent;
+      fontDescent = Math.abs(kit.descent);
+    }
+  } catch {
+    // fallback 到通用比例（类似 Arial/Helvetica）
+    fontAscent = unitsPerEm * 0.8;
+    fontDescent = unitsPerEm * 0.2;
+  }
+
   return {
     key: parsed.key,
     familyName,
@@ -95,8 +106,8 @@ function makeHandle(parsed: ParsedFont, familyName: string, synthItalic: boolean
       }
       return (adv / unitsPerEm) * sizePx;
     },
-    ascentPx: (sizePx) => (kit.ascent / unitsPerEm) * sizePx,
-    descentPx: (sizePx) => (Math.abs(kit.descent) / unitsPerEm) * sizePx,
+    ascentPx: (sizePx) => (fontAscent / unitsPerEm) * sizePx,
+    descentPx: (sizePx) => (fontDescent / unitsPerEm) * sizePx,
   };
 }
 
@@ -107,7 +118,6 @@ async function fetchBytes(url: string): Promise<Uint8Array> {
 }
 
 // 加载并缓存所有需要的字体，返回 FontProvider + bytes 查询。
-// 浏览器环境调用；先由调用方收集 elements 用到的角色后再加载（这里简单：全量加载绑定字体 + 注册表里的自定义字体）。
 export interface FontBundle {
   provider: FontProvider;
   // 后端取字体 bytes（pdf 嵌入）
@@ -149,13 +159,6 @@ export async function loadFontBundle(
     systemFontKeys.set(name, key);
   }
 
-  // 预加载 CDN 基础字体（仅用于度量计算和 PDF 嵌入兜底）
-  // 不注册为中文字体别名，避免污染 document.fonts 覆盖系统字体
-  await ensure("serif-Regular", BUNDLED["serif-Regular"], "__noto_serif_sc__");
-  await ensure("serif-Bold", BUNDLED["serif-Bold"], "__noto_serif_sc_bold__");
-  await ensure("sans-Regular", BUNDLED["sans-Regular"], "__noto_sans_sc__");
-  await ensure("sans-Bold", BUNDLED["sans-Bold"], "__noto_sans_sc_bold__");
-
   // 自定义字体
   for (const [name, url] of Object.entries(custom)) await ensure(`custom-${name}`, url);
 
@@ -176,49 +179,16 @@ export async function loadFontBundle(
         return systemFontKeys.get(baseName)!;
       }
     }
-    // fallback 到 CDN 字体
-    const fallbackFamily = role.family === "serif" ? "serif" : "sans";
-    const fallbackKey = `${fallbackFamily}-${role.bold ? "Bold" : "Regular"}`;
-    if (parsedByKey.has(fallbackKey)) return fallbackKey;
     return null;
-  };
-
-  // 懒加载 CDN 字体（需要时才加载）
-  const ensureCdnFont = async (familyType: "sans" | "serif", bold: boolean) => {
-    const key = `${familyType}-${bold ? "Bold" : "Regular"}`;
-    if (!parsedByKey.has(key)) {
-      await ensure(key, BUNDLED[key]);
-    }
   };
 
   const provider: FontProvider = {
     async resolve(q) {
       const role = resolveFontRole(q);
-      let k = keyFor(role);
-
-      // 如果没有匹配到，尝试加载 CDN fallback 字体（仅用于度量计算）
-      if (!k) {
-        const lower = q.fontFamily.toLowerCase();
-        const isSerif =
-          lower.includes("serif") ||
-          lower.includes("song") ||
-          lower.includes("sun") ||
-          lower.includes("宋") ||
-          lower.includes("kai") ||
-          lower.includes("楷") ||
-          lower.includes("fang") ||
-          lower.includes("仿") ||
-          lower.includes("times") ||
-          lower.includes("georgia");
-        const familyType = isSerif ? "serif" : "sans";
-        const weight = WEIGHT_NUM[q.fontWeight] ?? 400;
-        const bold = weight >= 600;
-        await ensureCdnFont(familyType, bold);
-        k = keyFor(role);
-      }
+      const k = keyFor(role);
 
       if (!k) {
-        // 最后兜底：返回近似度量
+        // 无匹配字体：返回近似度量，Canvas 用原始 font-family 字符串，浏览器自动 fallback 到系统字体
         return {
           key: "",
           familyName: q.fontFamily,
@@ -231,17 +201,7 @@ export async function loadFontBundle(
       }
 
       const parsed = parsedByKey.get(k)!;
-
-      // 对于系统字体和自定义字体：直接使用已注册的 FontFace
-      // 对于 CDN 兜底字体：仅用于度量计算，不注册为用户字体名的别名
-      // Canvas 2D 渲染时直接使用用户选择的 font-family 字符串，浏览器会自动匹配系统字体
-      if (k.startsWith("system-") || k.startsWith("custom-")) {
-        // 系统字体或自定义字体：用 fontkit 提供精确度量，familyName 保留原始名
-        return makeHandle(parsed, q.fontFamily, role.synthItalic, q.fontWeight);
-      }
-
-      // CDN 兜底路径：使用 CDN 字体的精确度量，但 familyName 保留用户选择的字体名
-      // 这样 Canvas 2D 渲染时会尝试系统字体，而不是被 CDN 字体替代
+      // 系统字体或自定义字体：用 fontkit 提供精确度量，familyName 保留原始名
       return makeHandle(parsed, q.fontFamily, role.synthItalic, q.fontWeight);
     },
   };
