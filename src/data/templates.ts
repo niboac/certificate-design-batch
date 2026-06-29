@@ -94,7 +94,7 @@ export const CERTIFICATE_TEMPLATE: TemplateConfig = {
       x: 180,
       y: 400,
       width: 408,
-      height: "auto",
+      height: 222,
       rotation: 0,
       zIndex: 10,
       opacity: 1,
