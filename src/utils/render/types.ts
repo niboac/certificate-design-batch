@@ -36,6 +36,7 @@ export interface FontHandle {
   descentPx(fontSizePx: number): number;
   // 是否合成斜体（无 Italic 字重时由后端做 skew）
   synthItalic: boolean;
+  fontWeight?: FontWeight;
 }
 
 export interface FontProvider {

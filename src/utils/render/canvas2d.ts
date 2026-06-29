@@ -112,9 +112,10 @@ function drawText(ctx: CanvasRenderingContext2D, op: TextOp) {
     ctx.clip();
     ctx.fillStyle = cssColor(op.color);
     const italic = op.font.synthItalic ? "italic " : "";
+    const weight = op.font.fontWeight ? `${op.font.fontWeight} ` : "";
     // 使用原始 fontFamily 字符串，正确引用每个字体名让 Canvas 按 CSS fallback 链匹配系统字体
     const fam = quoteFontFamily(op.font.familyName || "sans-serif");
-    ctx.font = `${italic}${op.fontSizePx}px ${fam}`;
+    ctx.font = `${italic}${weight}${op.fontSizePx}px ${fam}`;
     for (const line of op.lines) {
       for (const g of line.glyphs) {
         ctx.fillText(g.ch, g.x, line.baselineY);

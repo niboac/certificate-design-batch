@@ -1,5 +1,6 @@
 import * as fontkit from "fontkit";
 import type { FontProvider, FontStyleQuery, FontHandle } from "./types";
+import type { FontWeight } from "@/types";
 
 export interface FontRole {
   family: "sans" | "serif" | "custom" | "system";
@@ -75,13 +76,14 @@ interface ParsedFont {
 const fontkitCreate = (buf: Buffer | Uint8Array): any => (fontkit as any).create(buf);
 
 // 用 fontkit 度量构造 FontHandle
-function makeHandle(parsed: ParsedFont, familyName: string, synthItalic: boolean): FontHandle {
+function makeHandle(parsed: ParsedFont, familyName: string, synthItalic: boolean, fontWeight?: FontWeight): FontHandle {
   const kit = parsed.kit;
   const unitsPerEm: number = kit.unitsPerEm;
   return {
     key: parsed.key,
     familyName,
     synthItalic,
+    fontWeight,
     advanceWidthPx(ch, sizePx) {
       const cp = ch.codePointAt(0) ?? 32;
       let adv: number;
@@ -221,6 +223,7 @@ export async function loadFontBundle(
           key: "",
           familyName: q.fontFamily,
           synthItalic: role.synthItalic,
+          fontWeight: q.fontWeight,
           advanceWidthPx: (ch, s) => (ch.charCodeAt(0) < 256 ? s * 0.5 : s),
           ascentPx: (s) => s * 0.8,
           descentPx: (s) => s * 0.2,
@@ -234,12 +237,12 @@ export async function loadFontBundle(
       // Canvas 2D 渲染时直接使用用户选择的 font-family 字符串，浏览器会自动匹配系统字体
       if (k.startsWith("system-") || k.startsWith("custom-")) {
         // 系统字体或自定义字体：用 fontkit 提供精确度量，familyName 保留原始名
-        return makeHandle(parsed, q.fontFamily, role.synthItalic);
+        return makeHandle(parsed, q.fontFamily, role.synthItalic, q.fontWeight);
       }
 
       // CDN 兜底路径：使用 CDN 字体的精确度量，但 familyName 保留用户选择的字体名
       // 这样 Canvas 2D 渲染时会尝试系统字体，而不是被 CDN 字体替代
-      return makeHandle(parsed, q.fontFamily, role.synthItalic);
+      return makeHandle(parsed, q.fontFamily, role.synthItalic, q.fontWeight);
     },
   };
 
@@ -257,13 +260,16 @@ export async function loadFontBundle(
 
 // 字体全部加载失败时的近似度量；canvas 用通用 sans-serif 绘制
 export function degenerateFontProvider(): FontProvider {
-  const handle: FontHandle = {
-    key: "", // 空 -> canvas2d 用通用 sans-serif
-    familyName: "sans-serif", // 使用通用字体名作为 fallback
-    synthItalic: false,
-    advanceWidthPx: (ch, s) => (ch.charCodeAt(0) < 256 ? s * 0.5 : s), // 半角 0.5em / 全角 1em
-    ascentPx: (s) => s * 0.8,
-    descentPx: (s) => s * 0.2,
+  return {
+    resolve: (q) =>
+      Promise.resolve({
+        key: "", // 空 -> canvas2d 用通用 sans-serif
+        familyName: "sans-serif", // 使用通用字体名作为 fallback
+        synthItalic: false,
+        fontWeight: q.fontWeight,
+        advanceWidthPx: (ch, s) => (ch.charCodeAt(0) < 256 ? s * 0.5 : s), // 半角 0.5em / 全角 1em
+        ascentPx: (s) => s * 0.8,
+        descentPx: (s) => s * 0.2,
+      }),
   };
-  return { resolve: () => Promise.resolve(handle) };
 }
