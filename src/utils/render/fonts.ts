@@ -80,7 +80,7 @@ function makeHandle(parsed: ParsedFont, familyName: string, synthItalic: boolean
   const unitsPerEm: number = kit.unitsPerEm;
   return {
     key: parsed.key,
-    familyName,
+    familyName: parsed.key,
     synthItalic,
     advanceWidthPx(ch, sizePx) {
       const cp = ch.codePointAt(0) ?? 32;
@@ -124,11 +124,11 @@ export async function loadFontBundle(
   const systemFontKeys = new Map<string, string>(); // fontFamily -> key
   const bytesByFaceKey = new Map<string, Uint8Array>(); // faceKey -> bytes
 
-  const ensure = async (key: string, source: string | ArrayBuffer) => {
+  const ensure = async (key: string, source: string | ArrayBuffer, faceFamily?: string) => {
     if (parsedByKey.has(key)) return;
     const bytes = typeof source === "string" ? await fetchBytes(source) : new Uint8Array(source);
     const kit = fontkitCreate(bytes as any);
-    const family = `render_${key}`;
+    const family = faceFamily || `render_${key}`;
     let fontFace: FontFace | undefined;
     if (typeof FontFace !== "undefined") {
       fontFace = new FontFace(family, bytes.buffer as ArrayBuffer);
@@ -140,10 +140,10 @@ export async function loadFontBundle(
     bytesByFaceKey.set(family, bytes);
   };
 
-  // 加载系统字体
+  // 加载系统字体（使用原始字体名作为 FontFace 家族名，确保预览和导出一致）
   for (const [name, buffer] of Object.entries(systemFonts)) {
     const key = `system-${name}`;
-    await ensure(key, buffer);
+    await ensure(key, buffer, name);
     systemFontKeys.set(name, key);
   }
 
