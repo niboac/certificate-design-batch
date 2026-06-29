@@ -27,6 +27,13 @@ const canExport = computed(
   () => excelStore.hasData && canvasStore.elements.length > 0 && !exportStore.exporting,
 )
 
+// 按钮文字
+const buttonText = computed(() => {
+  if (exportStore.preparing) return '正在准备导出...'
+  if (exportStore.exporting) return '导出中...'
+  return '开始批量导出'
+})
+
 // 当 Excel 数据变化时，重置导出范围
 watch(
   () => excelStore.totalRows,
@@ -161,7 +168,7 @@ watch(
         :disabled="!canExport"
         @click="exportStore.runExport()"
       >
-        {{ exportStore.exporting ? '导出中...' : '开始批量导出' }}
+        {{ buttonText }}
       </button>
 
       <div
@@ -182,15 +189,23 @@ watch(
         v-if="exportStore.exporting"
         class="progress-bar"
       >
-        <div class="progress-track">
-          <div
-            class="progress-fill"
-            :style="{ width: `${progressPercent}%` }"
-          />
+        <div
+          v-if="exportStore.preparing"
+          class="preparing-text"
+        >
+          正在加载字体...
         </div>
-        <span class="progress-text">
-          {{ exportStore.progress }} / {{ exportStore.total }} ({{ progressPercent }}%)
-        </span>
+        <template v-else>
+          <div class="progress-track">
+            <div
+              class="progress-fill"
+              :style="{ width: `${progressPercent}%` }"
+            />
+          </div>
+          <span class="progress-text">
+            {{ exportStore.progress }} / {{ exportStore.total }} ({{ progressPercent }}%)
+          </span>
+        </template>
       </div>
 
       <!-- 错误提示 -->
@@ -278,6 +293,13 @@ watch(
 
 .progress-bar {
   margin-top: 12px;
+}
+
+.preparing-text {
+  text-align: center;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  padding: 8px 0;
 }
 
 .progress-track {

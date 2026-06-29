@@ -15,6 +15,7 @@ export const useExportStore = defineStore('export', () => {
   const startRow = ref(0)
   const endRow = ref(0)
   const exporting = ref(false)
+  const preparing = ref(false)
   const progress = ref(0)
   const total = ref(0)
   const error = ref<string>('')
@@ -37,6 +38,7 @@ export const useExportStore = defineStore('export', () => {
     }
 
     exporting.value = true
+    preparing.value = true
     error.value = ''
     progress.value = 0
 
@@ -48,11 +50,6 @@ export const useExportStore = defineStore('export', () => {
     total.value = rows.length
 
     try {
-      // 确保自定义字体已加载
-      if (fontsStore.customFonts.length > 0 && document.fonts && document.fonts.ready) {
-        await document.fonts.ready
-      }
-
       await batchExport(
         canvasStore.elements,
         rows,
@@ -66,6 +63,12 @@ export const useExportStore = defineStore('export', () => {
             fontsStore.customFonts.map((f) => [f.name, f.url]),
           ),
           resolvePhotoUrl: (pathTemplate, row) => photosStore.resolvePhotoUrl(pathTemplate, row),
+          onPrepare: () => {
+            preparing.value = true
+          },
+          onStart: () => {
+            preparing.value = false
+          },
           onProgress: (current) => {
             progress.value = current
           },
@@ -76,6 +79,7 @@ export const useExportStore = defineStore('export', () => {
       error.value = message
     } finally {
       exporting.value = false
+      preparing.value = false
     }
   }
 
@@ -86,6 +90,7 @@ export const useExportStore = defineStore('export', () => {
     startRow,
     endRow,
     exporting,
+    preparing,
     progress,
     total,
     error,

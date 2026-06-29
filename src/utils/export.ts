@@ -14,6 +14,7 @@ interface BatchExportOptions {
   draft: DraftConfig | null;
   customFonts?: CustomFontRegistry;
   resolvePhotoUrl?: (pathTemplate: string, row: Record<string, string>) => string;
+  onPrepare?: () => void;
   onStart?: (total: number) => void;
   onProgress?: (current: number, total: number) => void;
 }
@@ -122,9 +123,9 @@ export async function batchExport(
   paper: PaperConfig,
   options: BatchExportOptions,
 ): Promise<void> {
-  const { format, quality, fileName, draft, customFonts, resolvePhotoUrl, onStart, onProgress } = options;
+  const { format, quality, fileName, draft, customFonts, resolvePhotoUrl, onPrepare, onStart, onProgress } = options;
   const total = rows.length;
-  onStart?.(total);
+  onPrepare?.();
 
   const widthPx = unitToPx(paper.width, paper.unit);
   const heightPx = unitToPx(paper.height, paper.unit);
@@ -137,40 +138,25 @@ export async function batchExport(
   }
   const provider = bundle ? bundle.provider : degenerateFontProvider();
 
+  onStart?.(total);
+
   if (format === "pdf") {
-    if (bundle) {
-      const pdfPages: DrawOp[][] = [];
-      const pdfImages = new Map<string, Uint8Array>();
-      for (let i = 0; i < total; i++) {
-        const { images, elementImages, draftResolved } = await resolveRowImages(elements, rows[i], draft, resolvePhotoUrl);
-        const ops = computeLayout(elements, rows[i], paper, {
-          fonts: provider,
-          images,
-          draft: draftResolved ? { resolved: draftResolved, opacity: draft!.opacity } : null,
-        });
-        await prepareImagesForPdf(ops, elementImages, i, pdfImages);
-        pdfPages.push(ops);
-        onProgress?.(i + 1, total);
-      }
-      const bytes = await renderPdf({ pages: pdfPages, widthPx, heightPx, bytesOf: bundle.bytesOf, images: pdfImages });
-      saveAs(new Blob([bytes], { type: "application/pdf" }), `${fileName}.pdf`);
-    } else {
-      const pngs: Uint8Array[] = [];
-      for (let i = 0; i < total; i++) {
-        const { images, elementImages, draftResolved } = await resolveRowImages(elements, rows[i], draft, resolvePhotoUrl);
-        const ops = computeLayout(elements, rows[i], paper, {
-          fonts: provider,
-          images,
-          draft: draftResolved ? { resolved: draftResolved, opacity: draft!.opacity } : null,
-        });
-        const canvas = renderToCanvas({ ops, widthPx, heightPx, deviceScale: 2, images: elementImages });
-        const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, "image/png"));
-        if (blob) pngs.push(new Uint8Array(await blob.arrayBuffer()));
-        onProgress?.(i + 1, total);
-      }
-      const bytes = await renderRasterPdf(pngs, widthPx, heightPx);
-      saveAs(new Blob([bytes], { type: "application/pdf" }), `${fileName}.pdf`);
+    // 使用光栅模式导出 PDF（Canvas 渲染 → 图片 → PDF），确保中文等复杂文字正确显示
+    const pngs: Uint8Array[] = [];
+    for (let i = 0; i < total; i++) {
+      const { images, elementImages, draftResolved } = await resolveRowImages(elements, rows[i], draft, resolvePhotoUrl);
+      const ops = computeLayout(elements, rows[i], paper, {
+        fonts: provider,
+        images,
+        draft: draftResolved ? { resolved: draftResolved, opacity: draft!.opacity } : null,
+      });
+      const canvas = renderToCanvas({ ops, widthPx, heightPx, deviceScale: 2, images: elementImages });
+      const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, "image/png"));
+      if (blob) pngs.push(new Uint8Array(await blob.arrayBuffer()));
+      onProgress?.(i + 1, total);
     }
+    const bytes = await renderRasterPdf(pngs, widthPx, heightPx);
+    saveAs(new Blob([bytes], { type: "application/pdf" }), `${fileName}.pdf`);
     return;
   }
 
