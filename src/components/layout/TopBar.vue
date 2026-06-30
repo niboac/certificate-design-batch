@@ -67,11 +67,7 @@ function clearCanvas(): void {
   showFileMenu.value = false;
 }
 
-// 加载示例数据
-function loadDemo(): void {
-  excelStore.loadDemo();
-  showFileMenu.value = false;
-}
+
 
 // 关闭所有菜单
 function closeAllMenus(): void {
@@ -117,6 +113,7 @@ function closeAllMenus(): void {
         <div
           v-if="showFileMenu"
           class="dropdown-menu"
+          @click.stop
         >
           <button
             class="dropdown-item"
@@ -130,14 +127,7 @@ function closeAllMenus(): void {
           >
             加载设计
           </button>
-          <div class="dropdown-divider" />
-          <button
-            class="dropdown-item"
-            @click="loadDemo"
-          >
-            使用 demo 数据
-          </button>
-          <div class="dropdown-divider" />
+
           <button
             class="dropdown-item danger"
             @click="clearCanvas"
@@ -164,6 +154,7 @@ function closeAllMenus(): void {
         <div
           v-if="showFontMenu"
           class="dropdown-menu"
+          @click.stop
         >
           <div class="dropdown-hint">
             使用系统已安装字体
