@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, watch, onUnmounted } from "vue";
 import { useCanvasStore } from "@/stores/canvas";
 import { useExcelStore } from "@/stores/excel";
 
@@ -10,6 +10,39 @@ const excelStore = useExcelStore();
 const showFileMenu = ref(false);
 const showFontMenu = ref(false);
 const showAbout = ref(false);
+
+// 菜单 ref
+const fileMenuRef = ref<HTMLElement | null>(null);
+const fontMenuRef = ref<HTMLElement | null>(null);
+
+// 关闭菜单的函数
+function closeMenus(): void {
+  showFileMenu.value = false;
+  showFontMenu.value = false;
+}
+
+// 监听菜单打开状态，绑定/解绑 document 点击
+watch([showFileMenu, showFontMenu], ([fileOpen, fontOpen]) => {
+  if (fileOpen || fontOpen) {
+    document.addEventListener("click", handleDocumentClick);
+  } else {
+    document.removeEventListener("click", handleDocumentClick);
+  }
+});
+
+function handleDocumentClick(e: MouseEvent): void {
+  const target = e.target as HTMLElement;
+  // 检查是否点击在菜单外部
+  const clickedFileMenu = fileMenuRef.value?.contains(target);
+  const clickedFontMenu = fontMenuRef.value?.contains(target);
+  if (!clickedFileMenu && !clickedFontMenu) {
+    closeMenus();
+  }
+}
+
+onUnmounted(() => {
+  document.removeEventListener("click", handleDocumentClick);
+});
 
 // 保存设计到本地
 function saveDesign(): void {
@@ -69,11 +102,7 @@ function clearCanvas(): void {
 
 
 
-// 关闭所有菜单
-function closeAllMenus(): void {
-  showFileMenu.value = false;
-  showFontMenu.value = false;
-}
+
 </script>
 
 <template>
@@ -92,13 +121,10 @@ function closeAllMenus(): void {
       </div>
     </div>
 
-    <div
-      class="actions"
-      @click="closeAllMenus"
-    >
+    <div class="actions">
       <div
+        ref="fileMenuRef"
         class="action-group"
-        @click.stop
       >
         <button
           class="btn btn-default btn-sm"
@@ -113,7 +139,6 @@ function closeAllMenus(): void {
         <div
           v-if="showFileMenu"
           class="dropdown-menu"
-          @click.stop
         >
           <button
             class="dropdown-item"
@@ -138,8 +163,8 @@ function closeAllMenus(): void {
       </div>
 
       <div
+        ref="fontMenuRef"
         class="action-group"
-        @click.stop
       >
         <button
           class="btn btn-default btn-sm"
@@ -154,7 +179,6 @@ function closeAllMenus(): void {
         <div
           v-if="showFontMenu"
           class="dropdown-menu"
-          @click.stop
         >
           <div class="dropdown-hint">
             使用系统已安装字体
@@ -315,7 +339,7 @@ function closeAllMenus(): void {
 .dropdown-hint {
   padding: 8px 12px;
   font-size: 12px;
-  color: var(--color-text-tertiary);
+  color: var(--color-text-secondary);
 }
 
 .modal-mask {
