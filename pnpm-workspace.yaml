@@ -4,3 +4,13 @@ allowBuilds:
   vue-demi: true
 minimumReleaseAgeExclude:
   - vite@8.1.0
+  - '@typescript-eslint/eslint-plugin@8.62.1'
+  - '@typescript-eslint/parser@8.62.1'
+  - '@typescript-eslint/project-service@8.62.1'
+  - '@typescript-eslint/scope-manager@8.62.1'
+  - '@typescript-eslint/tsconfig-utils@8.62.1'
+  - '@typescript-eslint/type-utils@8.62.1'
+  - '@typescript-eslint/types@8.62.1'
+  - '@typescript-eslint/typescript-estree@8.62.1'
+  - '@typescript-eslint/utils@8.62.1'
+  - '@typescript-eslint/visitor-keys@8.62.1'
