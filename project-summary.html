@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>批量证件设计器 - 项目总结</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      background: linear-gradient(135deg, #f5f7fa 0%, #e8edf3 100%);
+      color: #1f2937;
+      line-height: 1.7;
+      padding: 40px 20px;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+      background: #ffffff;
+      border-radius: 16px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
+      overflow: hidden;
+    }
+
+    /* 顶部封面 */
+    .cover {
+      background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
+      color: #ffffff;
+      padding: 60px 40px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .cover::before {
+      content: "";
+      position: absolute;
+      top: -50%;
+      right: -20%;
+      width: 400px;
+      height: 400px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 50%;
+    }
+
+    .cover::after {
+      content: "";
+      position: absolute;
+      bottom: -30%;
+      left: -10%;
+      width: 300px;
+      height: 300px;
+      background: rgba(255, 255, 255, 0.06);
+      border-radius: 50%;
+    }
+
+    .cover-logo {
+      width: 80px;
+      height: 80px;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 20px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 40px;
+      font-weight: 700;
+      margin-bottom: 24px;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+    }
+
+    .cover h1 {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 12px;
+      letter-spacing: 2px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .cover p {
+      font-size: 16px;
+      opacity: 0.9;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* 主体内容 */
+    .content {
+      padding: 48px 40px;
+    }
+
+    .section {
+      margin-bottom: 48px;
+    }
+
+    .section:last-child {
+      margin-bottom: 0;
+    }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 2px solid #e5e7eb;
+    }
+
+    .section-number {
+      width: 36px;
+      height: 36px;
+      background: linear-gradient(135deg, #2563eb, #7c3aed);
+      color: #ffffff;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: #111827;
+    }
+
+    /* 创意介绍卡片 */
+    .intro-card {
+      background: linear-gradient(135deg, #eff6ff 0%, #f5f3ff 100%);
+      border-left: 4px solid #2563eb;
+      padding: 24px 28px;
+      border-radius: 12px;
+      margin-bottom: 28px;
+    }
+
+    .creative-name {
+      font-size: 28px;
+      font-weight: 700;
+      color: #1e40af;
+      margin-bottom: 12px;
+      letter-spacing: 1px;
+    }
+
+    .creative-tagline {
+      font-size: 15px;
+      color: #4b5563;
+      font-style: italic;
+    }
+
+    .intro-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 20px;
+    }
+
+    .intro-item {
+      background: #ffffff;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      padding: 24px;
+      transition: all 0.3s ease;
+    }
+
+    .intro-item:hover {
+      border-color: #2563eb;
+      box-shadow: 0 4px 16px rgba(37, 99, 235, 0.1);
+      transform: translateY(-2px);
+    }
+
+    .intro-item-label {
+      display: inline-block;
+      font-size: 12px;
+      font-weight: 600;
+      color: #2563eb;
+      background: #eff6ff;
+      padding: 4px 12px;
+      border-radius: 20px;
+      margin-bottom: 12px;
+      letter-spacing: 0.5px;
+    }
+
+    .intro-item-content {
+      font-size: 15px;
+      color: #374151;
+      line-height: 1.8;
+    }
+
+    /* 用户痛点 */
+    .pain-points-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 20px;
+    }
+
+    .pain-point-card {
+      background: #ffffff;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      padding: 24px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .pain-point-card::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 4px;
+      height: 100%;
+      background: linear-gradient(180deg, #2563eb, #7c3aed);
+    }
+
+    .pain-point-icon {
+      font-size: 32px;
+      margin-bottom: 12px;
+    }
+
+    .pain-point-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #111827;
+      margin-bottom: 10px;
+    }
+
+    .pain-point-desc {
+      font-size: 14px;
+      color: #4b5563;
+      line-height: 1.7;
+    }
+
+    /* 价值意义 */
+    .value-list {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 20px;
+    }
+
+    .value-item {
+      background: #ffffff;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      padding: 28px;
+      display: flex;
+      gap: 20px;
+      align-items: flex-start;
+      transition: all 0.3s ease;
+    }
+
+    .value-item:hover {
+      border-color: #7c3aed;
+      box-shadow: 0 4px 16px rgba(124, 58, 237, 0.1);
+    }
+
+    .value-icon {
+      width: 56px;
+      height: 56px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+      flex-shrink: 0;
+    }
+
+    .value-icon.efficiency {
+      background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+    }
+
+    .value-icon.social {
+      background: linear-gradient(135deg, #ede9fe, #ddd6fe);
+    }
+
+    .value-content h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: #111827;
+      margin-bottom: 8px;
+    }
+
+    .value-content p {
+      font-size: 14px;
+      color: #4b5563;
+      line-height: 1.8;
+    }
+
+    /* 底部 */
+    .footer {
+      background: #f9fafb;
+      padding: 24px 40px;
+      text-align: center;
+      border-top: 1px solid #e5e7eb;
+    }
+
+    .footer p {
+      font-size: 13px;
+      color: #6b7280;
+    }
+
+    .footer .tech-stack {
+      margin-top: 8px;
+      font-size: 12px;
+      color: #9ca3af;
+    }
+
+    /* 响应式 */
+    @media (max-width: 640px) {
+      .cover {
+        padding: 40px 24px;
+      }
+
+      .cover h1 {
+        font-size: 28px;
+      }
+
+      .content {
+        padding: 32px 24px;
+      }
+
+      .value-item {
+        flex-direction: column;
+        gap: 16px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- 顶部封面 -->
+    <div class="cover">
+      <div class="cover-logo">证</div>
+      <h1>批量证件设计器</h1>
+      <p>Excel 数据驱动的可视化排版工具 · 让批量证件生成更简单</p>
+    </div>
+
+    <!-- 主体内容 -->
+    <div class="content">
+
+      <!-- 1. 创意名称 + 创意介绍 -->
+      <div class="section">
+        <div class="section-header">
+          <div class="section-number">1</div>
+          <div class="section-title">创意名称与介绍</div>
+        </div>
+
+        <div class="intro-card">
+          <div class="creative-name">批量证件设计器</div>
+          <div class="creative-tagline">"用一张 Excel 表，批量生成千人千面的专业证件"</div>
+        </div>
+
+        <div class="intro-grid">
+          <div class="intro-item">
+            <span class="intro-item-label">想解决什么问题</span>
+            <div class="intro-item-content">
+              学校、企业、机构在颁发证书、奖状、通知时，往往需要为数百上千人逐份制作个性化文档，传统方式要么依赖 Word 邮件合并（操作复杂、样式单一），要么手工逐张修改（效率极低且易错）。本工具希望解决"大规模个性化文档批量生成"这一痛点。
+            </div>
+          </div>
+
+          <div class="intro-item">
+            <span class="intro-item-label">为什么会想到做这个</span>
+            <div class="intro-item-content">
+              灵感源于现实场景：每到期末或年终，教师、行政人员都要为一两百名学生或员工制作证书奖状。现有工具要么太专业（PS/AI 学习门槛高），要么太死板（Word 模板无法可视化调整），缺少一款"普通人也能上手、所见即所得、一次排版批量产出"的轻量工具。
+            </div>
+          </div>
+
+          <div class="intro-item">
+            <span class="intro-item-label">大概是什么产品</span>
+            <div class="intro-item-content">
+              一款纯前端 Web 应用（网站），基于浏览器运行，无需安装，打开即用。用户导入 Excel 数据、在可视化画布上拖拽排版、一键批量导出 PDF/PNG/JPG。
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. 目标用户及痛点 -->
+      <div class="section">
+        <div class="section-header">
+          <div class="section-number">2</div>
+          <div class="section-title">目标用户及痛点</div>
+        </div>
+
+        <div class="pain-points-grid">
+          <div class="pain-point-card">
+            <div class="pain-point-icon">👥</div>
+            <div class="pain-point-title">面向哪些用户</div>
+            <div class="pain-point-desc">
+              核心用户群体包括：<strong>学校教师与教务人员</strong>（批量制作学生证书、奖状、奖牌）、<strong>企业 HR 与行政部门</strong>（员工荣誉证书、培训结业证、表彰通知）、<strong>政府与事业单位工作人员</strong>（会议通知、聘书、荣誉证书）、<strong>活动组织者</strong>（赛事奖项、参会证明）。这些用户的共同特征是：非设计专业，但需要频繁产出规范、美观的正式文档。
+            </div>
+          </div>
+
+          <div class="pain-point-card">
+            <div class="pain-point-icon">🎯</div>
+            <div class="pain-point-title">在什么场景下使用</div>
+            <div class="pain-point-desc">
+              典型使用场景：期末颁发学生奖状、年度优秀员工表彰、培训结业证书发放、大型会议通知下发、比赛奖项证书制作、聘书与荣誉证书签发等。用户提前准备好一份 Excel 名单（含姓名、编号、单位等字段），在画布上设计好一份模板，即可一键生成全部成品文件，直接打印或电子分发。
+            </div>
+          </div>
+
+          <div class="pain-point-card">
+            <div class="pain-point-icon">😖</div>
+            <div class="pain-point-title">当前痛点</div>
+            <div class="pain-point-desc">
+              没有本产品时，用户面临三大不便：<br>
+              ① <strong>效率低下</strong>——手工逐张修改姓名、编号，200 份证书需要数小时；<br>
+              ② <strong>工具门槛高</strong>——专业设计软件（PS/AI）学习成本高，普通行政人员难以驾驭；<br>
+              ③ <strong>样式难统一</strong>——多人手工制作容易导致字体、位置、格式不一致，影响机构专业形象；<br>
+              ④ <strong>修改成本高</strong>——一旦模板调整，已生成的文件需全部重做。
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. 价值与意义 -->
+      <div class="section">
+        <div class="section-header">
+          <div class="section-number">3</div>
+          <div class="section-title">价值与意义</div>
+        </div>
+
+        <div class="value-list">
+          <div class="value-item">
+            <div class="value-icon efficiency">⚡</div>
+            <div class="value-content">
+              <h3>效率提升：从"小时级"到"分钟级"的批量产出</h3>
+              <p>
+                通过"数据 + 模板"的设计理念，将原本需要逐份手工制作的证件制作流程自动化。用户只需设计一次模板，导入 Excel 数据后即可一键批量生成数百份个性化文档。以 200 份证书为例，传统手工方式需 3-4 小时，使用本工具仅需 1-2 分钟，效率提升近 100 倍。同时，可视化拖拽排版大幅降低了操作门槛，非设计人员也能产出专业级版式，真正实现"人人都是设计师"。
+              </p>
+            </div>
+          </div>
+
+          <div class="value-item">
+            <div class="value-icon social">🌍</div>
+            <div class="value-content">
+              <h3>社会价值：推动教育与企业管理的数字化普惠</h3>
+              <p>
+                本工具降低了正式文档制作的门槛，让资源有限的基层学校、中小型企业、偏远地区机构也能轻松产出高质量的证书、奖状与通知。这不仅提升了组织的专业形象与仪式感，更在一定程度上促进了"尊重个体、重视荣誉"的文化建设——每一份证书都是对个人付出的正式认可。同时，纯前端架构无需安装、数据不上传服务器，既保护了用户隐私，又契合绿色低碳的无纸化办公趋势。
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- 底部 -->
+    <div class="footer">
+      <p>批量证件设计器 · Vue 3 + TypeScript + Pinia + Vite</p>
+      <p class="tech-stack">技术栈：Vue 3 · TypeScript · Pinia · Vite · pdf-lib · xlsx</p>
+    </div>
+  </div>
+</body>
+</html>
